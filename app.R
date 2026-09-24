@@ -13,6 +13,8 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       width = 3,
+      selectInput("thema", "Thema",
+                  choices = c("— eigen keuze —" = "", names(THEMASETS))),
       selectizeInput(
         "termen", "Zoektermen",
         choices = TERMEN,
@@ -30,6 +32,16 @@ ui <- fluidPage(
       sliderInput("jaren", "Periode (vergaderdatum)",
                   min = EERSTE_JAAR, max = HUIDIG_JAAR,
                   value = c(2020, HUIDIG_JAAR), step = 1, sep = ""),
+      checkboxInput("opt_context", "Alleen in cultuurcontext",
+                    value = STANDAARD_OPTIES$context),
+      checkboxInput("opt_dedup", "Dubbele bijlagen samenvoegen",
+                    value = STANDAARD_OPTIES$dedup),
+      checkboxInput("opt_woordvormen", "Ook woordvormen (amateurkunst*)",
+                    value = STANDAARD_OPTIES$woordvormen),
+      helpText(sprintf(paste(
+        "Cultuurcontext: een term telt alleen als binnen %d woorden een",
+        "cultuurwoord staat (cultuur, kunst, muziek, theater, …). Geldt niet",
+        "voor termen die zelf al over cultuur gaan."), CONTEXT_AFSTAND)),
       actionButton("ophalen", "Haal Live Data Op",
                    class = "btn-primary", width = "100%"),
       hr(),
@@ -53,7 +65,8 @@ ui <- fluidPage(
           "Kaart & ranking", value = "kaart",
           br(),
           leafletOutput("kaart", height = 480),
-          helpText("Klik op een cirkel om de trend van die gemeente te zien."),
+          helpText("Klik op een gemeente om de trend te zien. Grijs: geen",
+                   "archief of te weinig documenten voor deze maatstaf."),
           tableOutput("tabel")
         ),
         tabPanel(
@@ -99,8 +112,21 @@ server <- function(input, output, session) {
   resultaat <- reactiveVal(NULL)
   foutmelding <- reactiveVal(NULL)
 
+  observeEvent(input$thema, {
+    req(nzchar(input$thema))
+    updateSelectizeInput(session, "termen", selected = THEMASETS[[input$thema]])
+  })
+
+  zoekopties <- reactive(list(
+    context = isTRUE(input$opt_context),
+    woordvormen = isTRUE(input$opt_woordvormen),
+    dedup = isTRUE(input$opt_dedup)
+  ))
+
   observeEvent(input$ophalen, {
-    termen <- unique(tolower(trimws(input$termen)))
+    # Alleen letters, cijfers, spaties, koppel- en apostroftekens
+    termen <- gsub("[^[:alnum:] '-]", "", tolower(trimws(input$termen)))
+    termen <- unique(gsub("\\s+", " ", trimws(termen)))
     termen <- termen[nchar(termen) >= 2]
     if (length(termen) == 0) {
       showNotification("Kies minstens één zoekterm.", type = "warning")
@@ -113,9 +139,14 @@ server <- function(input, output, session) {
 
     res <- withCallingHandlers(
       tryCatch(
-        haal_data_op(termen, input$jaren),
+        haal_data_op(termen, input$jaren, zoekopties()),
         httr2_failure = function(e) {
           foutmelding(paste("Geen verbinding met de API:", conditionMessage(e)))
+          NULL
+        },
+        httr2_http_429 = function(e) {
+          foutmelding(paste("De API krijgt even te veel verzoeken.",
+                            "Probeer het over een minuut opnieuw."))
           NULL
         },
         error = function(e) {
@@ -159,6 +190,11 @@ server <- function(input, output, session) {
       tags$b(met_treffers), " gemeenten",
       tags$br(), tags$small(sprintf("%d–%d · %s", res$jaren[1], res$jaren[2],
                                     paste(res$termen, collapse = ", "))),
+      tags$br(), tags$small(paste(c(
+        if (res$opties$context) "cultuurcontext",
+        if (res$opties$dedup) "zonder dubbele bijlagen",
+        if (res$opties$woordvormen) "met woordvormen"
+      ), collapse = " · ")),
       if (!res$inwoners_ok) {
         tags$div(class = "text-warning", "CBS-inwonersdata niet beschikbaar.")
       }
@@ -169,64 +205,46 @@ server <- function(input, output, session) {
   gerangschikt <- reactive({
     res <- resultaat()
     req(res)
-    kolom <- switch(input$maatstaf, relatief = "per_1000",
-                    inwoners = "per_100k", absoluut = "totaal")
     res$per_gemeente |>
       filter(totaal > 0) |>
-      mutate(waarde = .data[[kolom]]) |>
+      mutate(waarde = .data[[maatstaf_kolom(input$maatstaf)]]) |>
       filter(!is.na(waarde)) |>
       arrange(desc(waarde))
   })
 
   # --- Kaart ---
 
-  output$kaart <- renderLeaflet({
-    leaflet() |>
-      # PDOK-achtergrondkaart (Kadaster): gratis, geen API-key nodig
-      addTiles(
-        urlTemplate = "https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/grijs/EPSG:3857/{z}/{x}/{y}.png",
-        attribution = "Kaartgegevens &copy; <a href='https://www.kadaster.nl'>Kadaster</a>",
-        options = tileOptions(minZoom = 6, maxZoom = 19)
-      ) |>
-      setView(lng = 5.3, lat = 52.2, zoom = 7)
+  output$kaart <- renderLeaflet(basiskaart())
+
+  # Gemeentegrenzen: eerste keer ~2 s bij PDOK, daarna uit de schijfcache
+  grenzen <- tryCatch(haal_gemeentegrenzen(), error = function(e) {
+    showNotification(paste("Gemeentegrenzen niet beschikbaar:",
+                           conditionMessage(e)), type = "error", duration = 10)
+    NULL
   })
 
   observe({
-    punten <- gerangschikt() |> filter(!is.na(lat), waarde > 0)
-
-    proxy <- leafletProxy("kaart") |> clearMarkers()
-    if (nrow(punten) == 0) return()
-
-    eenheid <- switch(input$maatstaf,
-                      relatief = "per 1.000 docs",
-                      inwoners = "per 100.000 inw./jaar",
-                      absoluut = "documenten")
-    maxn <- max(punten$waarde)
-    punten <- punten |>
-      mutate(
-        straal = 6 + 30 * sqrt(waarde / maxn),
-        label = sprintf("%s: %s %s", gemeente,
-                        fmt(waarde, if (input$maatstaf == "absoluut") 0 else 1),
-                        eenheid),
-        popup = sprintf(paste(
-          "<b>%s</b><br>%s documenten<br>%s per 1.000 raadsdocumenten",
-          "<br>%s per 100.000 inwoners per jaar"),
-          gemeente, fmt(totaal, 0), fmt(per_1000), fmt(per_100k))
-      )
-
-    proxy |>
-      addCircleMarkers(
-        data = punten, lng = ~lon, lat = ~lat, radius = ~straal,
-        layerId = ~key,
-        stroke = TRUE, weight = 1, color = "#7a1f5c",
-        fillColor = "#c2378f", fillOpacity = 0.55,
-        label = ~label, popup = ~popup
-      )
+    req(grenzen)
+    res <- resultaat()
+    req(res)
+    kaart_df <- maak_kaart_df(grenzen, res$per_gemeente, input$maatstaf)
+    leafletProxy("kaart") |>
+      clearShapes() |>
+      clearControls() |>
+      voeg_kaartlagen_toe(kaart_df, input$maatstaf)
   })
 
-  observeEvent(input$kaart_marker_click, {
-    updateSelectInput(session, "trend_gemeente",
-                      selected = input$kaart_marker_click$id)
+  observeEvent(input$kaart_shape_click, {
+    res <- resultaat()
+    req(res)
+    key <- res$per_gemeente$key[
+      res$per_gemeente$gemeentecode %in% input$kaart_shape_click$id]
+    if (length(key) == 0) {
+      showNotification("Van deze gemeente is geen raadsarchief beschikbaar.",
+                       type = "warning")
+      return()
+    }
+    updateSelectInput(session, "trend_gemeente", selected = key[1])
     updateTabsetPanel(session, "tabs", selected = "trend")
   })
 
@@ -247,8 +265,7 @@ server <- function(input, output, session) {
         Totaal = fmt(totaal, 0),
         across(all_of(res$termen)),
         `Archief (docs)` = fmt(archief, 0),
-        Inwoners = fmt(inwoners, 0),
-        `Op kaart` = ifelse(is.na(lat), "", "✓")
+        Inwoners = fmt(inwoners, 0)
       )
   }, striped = TRUE, hover = TRUE, align = "l")
 
@@ -263,7 +280,7 @@ server <- function(input, output, session) {
     rij <- res$per_gemeente |> filter(key == input$trend_gemeente)
     req(nrow(rij) == 1)
     data <- tryCatch(
-      haal_trend_gemeente(rij$ruw[[1]], res$termen, res$jaren),
+      haal_trend_gemeente(rij$ruw[[1]], res$termen, res$jaren, res$opties),
       error = function(e) {
         showNotification(paste("Trend ophalen mislukt:", conditionMessage(e)),
                          type = "error", duration = 8)

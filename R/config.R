@@ -21,58 +21,36 @@ TERMEN <- list(
 )
 STANDAARD_TERMEN <- c("amateurkunst", "cultuurbeoefening", "talentontwikkeling")
 
+# Kiezen in de dropdown 'Thema' vervangt de zoektermen door deze set
+THEMASETS <- list(
+  "Cultuurparticipatie" = c("amateurkunst", "cultuurbeoefening",
+                            "cultuurparticipatie"),
+  "Cultuuronderwijs" = c("cultuureducatie", "muziekonderwijs", "muziekschool"),
+  "Talent & podium" = c("talentontwikkeling", "podiumkunsten"),
+  "Bibliotheek & erfgoed" = c("bibliotheek", "erfgoed"),
+  "Cultuurbeleid" = c("cultuurbeleid", "kunstenplan")
+)
+
+# Cultuurcontext: een term telt alleen als er binnen CONTEXT_AFSTAND woorden
+# een van deze woorden staat. Zonder deze eis gaat bv. 'talentontwikkeling'
+# grotendeels over sport en onderwijs (22.505 -> 6.967 treffers sinds 2020).
+# Vaste woorden i.p.v. prefixen: 'kunst*' pakt ook kunstgras en kunstwerken
+# (bruggen), en 'cultu*' loopt tegen de expansielimiet van de server aan.
+CONTEXT_AFSTAND <- 15
+CULTUURWOORDEN <- c(
+  "cultuur", "culturele", "cultureel", "kunst", "kunsten", "kunstenaar",
+  "kunstenaars", "kunstzinnig", "kunstzinnige", "muziek", "muziekles",
+  "muzieklessen", "muziekschool", "muziekonderwijs", "theater", "theaters",
+  "museum", "musea", "dans", "podium", "podiumkunsten", "erfgoed",
+  "amateurkunst", "cultuureducatie", "cultuurparticipatie", "cultuurcoach",
+  "cultuurcoaches", "creatief", "creatieve"
+)
+# Termen die zelf al over cultuur gaan krijgen geen extra contexteis
+CULTUUR_REGEX <- "cultu|kunst|muziek|theater|muse|podium|erfgoed|dans"
+
 MAATSTAVEN <- c("Per 1.000 raadsdocumenten" = "relatief",
                 "Per 100.000 inwoners (per jaar)" = "inwoners",
                 "Absoluut (aantal documenten)" = "absoluut")
-
-# Hardcoded coördinaten; 'key' = genormaliseerde gemeentenaam (zie naar_key()).
-GEMEENTEN <- tribble(
-  ~key,             ~gemeente,          ~lat,    ~lon,
-  "amsterdam",      "Amsterdam",        52.3676, 4.9041,
-  "rotterdam",      "Rotterdam",        51.9244, 4.4777,
-  "den_haag",       "Den Haag",         52.0705, 4.3007,
-  "utrecht",        "Utrecht",          52.0907, 5.1214,
-  "eindhoven",      "Eindhoven",        51.4416, 5.4697,
-  "groningen",      "Groningen",        53.2194, 6.5665,
-  "tilburg",        "Tilburg",          51.5555, 5.0913,
-  "almere",         "Almere",           52.3508, 5.2647,
-  "breda",          "Breda",            51.5719, 4.7683,
-  "nijmegen",       "Nijmegen",         51.8126, 5.8372,
-  "apeldoorn",      "Apeldoorn",        52.2112, 5.9699,
-  "arnhem",         "Arnhem",           51.9851, 5.8987,
-  "haarlem",        "Haarlem",          52.3874, 4.6462,
-  "haarlemmermeer", "Haarlemmermeer",   52.3030, 4.6890,
-  "amersfoort",     "Amersfoort",       52.1561, 5.3878,
-  "zaanstad",       "Zaanstad",         52.4570, 4.7510,
-  "enschede",       "Enschede",         52.2215, 6.8937,
-  "den_bosch",      "'s-Hertogenbosch", 51.6978, 5.3037,
-  "zwolle",         "Zwolle",           52.5168, 6.0830,
-  "zoetermeer",     "Zoetermeer",       52.0575, 4.4931,
-  "leiden",         "Leiden",           52.1601, 4.4970,
-  "maastricht",     "Maastricht",       50.8514, 5.6910,
-  "dordrecht",      "Dordrecht",        51.8133, 4.6901,
-  "ede",            "Ede",              52.0402, 5.6649,
-  "alkmaar",        "Alkmaar",          52.6324, 4.7534,
-  "emmen",          "Emmen",            52.7792, 6.9069,
-  "westland",       "Westland",         51.9990, 4.2090,
-  "delft",          "Delft",            52.0116, 4.3571,
-  "venlo",          "Venlo",            51.3704, 6.1724,
-  "deventer",       "Deventer",         52.2661, 6.1552,
-  "leeuwarden",     "Leeuwarden",       53.2012, 5.7999,
-  "lelystad",       "Lelystad",         52.5185, 5.4714,
-  "helmond",        "Helmond",          51.4793, 5.6570,
-  "hilversum",      "Hilversum",        52.2292, 5.1669,
-  "heerlen",        "Heerlen",          50.8882, 5.9795,
-  "amstelveen",     "Amstelveen",       52.3114, 4.8701,
-  "gouda",          "Gouda",            52.0115, 4.7105,
-  "assen",          "Assen",            52.9925, 6.5649,
-  "purmerend",      "Purmerend",        52.5050, 4.9597,
-  "sittard_geleen", "Sittard-Geleen",   51.0000, 5.8686,
-  "oss",            "Oss",              51.7650, 5.5180,
-  "roosendaal",     "Roosendaal",       51.5308, 4.4653,
-  "noordoostpolder","Noordoostpolder",  52.7100, 5.7500,
-  "hoogeveen",      "Hoogeveen",        52.7225, 6.4764
-)
 
 # CBS-namen die niet automatisch op de ORI-indexnaam passen
 CBS_NAAM_NAAR_KEY <- c(
@@ -88,6 +66,20 @@ CBS_NAAM_NAAR_KEY <- c(
   "Nuenen, Gerwen en Nederwetten" = "nuenen"
 )
 
+# Bekendere namen voor weergave (CBS gebruikt de officiële naam)
+WEERGAVENAAM <- c(den_haag = "Den Haag")
+
+# Archieven van opgeheven gemeenten tellen mee bij de huidige gemeente.
+# Let op: hun archief loopt maar tot de fusiedatum.
+FUSIES <- c(
+  weesp = "amsterdam",                       # 2022
+  beemster = "purmerend",                    # 2022
+  boxmeer = "land_van_cuijk", cuijk = "land_van_cuijk", grave = "land_van_cuijk",
+  mill_en_st_hubert = "land_van_cuijk", sint_anthonis = "land_van_cuijk",  # 2022
+  brielle = "voorne_aan_zee", westvoorne = "voorne_aan_zee",               # 2023
+  binnenmaas = "hoeksche_waard"              # 2019
+)
+
 # --- CBS: gemeentelijke lasten voor cultuur (Iv3) -----------------------------
 
 # "Gemeenten <jaar> onbewerkte Iv3-data" staan niet in de StatLine-catalogus
@@ -95,4 +87,9 @@ CBS_NAAM_NAAR_KEY <- c(
 IV3_TABELLEN <- c(`2023` = "45063NED", `2024` = "45067NED",
                   `2025` = "45071NED", `2026` = "45078NED")
 IV3_JAAR <- 2024                                  # meest recente jaarrekening
+# Verslagsoort: X005 = jaarrekening, X000 = (primitieve) begroting
+IV3_KEUZES <- c("Jaarrekening 2024" = "2024_rekening",
+                "Jaarrekening 2023" = "2023_rekening",
+                "Begroting 2026" = "2026_begroting",
+                "Begroting 2025" = "2025_begroting")
 IV3_TAAKVELDEN <- c("5.3", "5.4", "5.5", "5.6")   # cultuur, musea, erfgoed, media/bibliotheek

@@ -11,8 +11,12 @@ naar_key <- function(x) {
 # "ori_midden-delfland_20250525191105" -> "midden-delfland"
 index_naar_ruw <- function(index) sub("_[0-9]{8,}$", "", sub("^ori_", "", index))
 
-# Ruwe indexnaam -> key; Amsterdamse stadsdelen worden bij Amsterdam opgeteld
-ruw_naar_key <- function(ruw) sub("^amsterdam_.*$", "amsterdam", naar_key(ruw))
+# Ruwe indexnaam -> key. Amsterdamse stadsdelen worden bij Amsterdam opgeteld,
+# opgeheven gemeenten bij hun opvolger (zie FUSIES).
+ruw_naar_key <- function(ruw) {
+  key <- sub("^amsterdam_.*$", "amsterdam", naar_key(ruw))
+  ifelse(key %in% names(FUSIES), unname(FUSIES[key]), key)
+}
 
 # Indexpatroon voor één gemeente ("_2*" voorkomt dat bergen ook bergen_nh pakt)
 index_patroon <- function(ruwe_namen) {
@@ -29,4 +33,12 @@ nette_naam <- function(key) {
 fmt <- function(x, digits = 1) {
   ifelse(is.na(x), "–", formatC(x, format = "f", digits = digits,
                                 big.mark = ".", decimal.mark = ","))
+}
+
+# Zoektermen van de gebruiker: kleine letters, alleen letters, cijfers,
+# spaties, koppel- en apostroftekens; minimaal 2 tekens, geen dubbelen.
+schoon_termen <- function(termen) {
+  termen <- gsub("[^[:alnum:] '-]", "", tolower(trimws(termen)))
+  termen <- unique(gsub("\\s+", " ", trimws(termen)))
+  termen[nchar(termen) >= 2]
 }

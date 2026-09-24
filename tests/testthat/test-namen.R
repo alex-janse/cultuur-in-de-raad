@@ -20,3 +20,15 @@ test_that("fmt gebruikt Nederlandse notatie", {
   expect_equal(fmt(1234.5), "1.234,5")
   expect_equal(fmt(NA), "–")
 })
+
+test_that("archieven van opgeheven gemeenten tellen bij de opvolger", {
+  expect_equal(ruw_naar_key("weesp"), "amsterdam")
+  expect_equal(ruw_naar_key(c("cuijk", "grave", "utrecht")),
+               c("land_van_cuijk", "land_van_cuijk", "utrecht"))
+  expect_equal(ruw_naar_key("mill_en_st_hubert"), "land_van_cuijk")
+})
+
+test_that("schoon_termen haalt vreemde tekens en korte termen weg", {
+  expect_equal(schoon_termen(c(" Cultuur*Coach! ", "x", "kunst  en cultuur", "cultuurcoach")),
+               c("cultuurcoach", "kunst en cultuur"))
+})
