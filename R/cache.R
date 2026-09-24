@@ -11,8 +11,11 @@ schijf_cache <- function(naam, max_dagen, maak) {
     if (leeftijd < max_dagen) return(readRDS(pad))
   }
   data <- maak()
-  dir.create(cache_map(), showWarnings = FALSE, recursive = TRUE)
-  saveRDS(data, pad)
+  # Op een server met een alleen-lezen map werkt de app gewoon zonder cache
+  tryCatch({
+    dir.create(cache_map(), showWarnings = FALSE, recursive = TRUE)
+    saveRDS(data, pad)
+  }, error = function(e) NULL, warning = function(w) NULL)
   data
 }
 
