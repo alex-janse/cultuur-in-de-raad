@@ -12,7 +12,13 @@ thema_dashboard <- function(base_size = 14) {
 
 # df: gebied, jaar, term, n, archief (term '__alle__' = minstens één term).
 # Eén paneel per term met een eigen y-as, zodat kleine termen zichtbaar zijn.
-plot_trend <- function(df, termen, jaren, relatief = TRUE, titel = NULL) {
+# alleen_totaal = TRUE: één paneel met 'minstens één van de termen'.
+plot_trend <- function(df, termen, jaren, relatief = TRUE, titel = NULL,
+                       alleen_totaal = FALSE) {
+  if (alleen_totaal) {
+    df <- df |> filter(term == "__alle__")
+    termen <- ALLE_TERMEN_LABEL
+  }
   df <- df |>
     mutate(
       term = ifelse(term == "__alle__", ALLE_TERMEN_LABEL, term),
@@ -20,7 +26,9 @@ plot_trend <- function(df, termen, jaren, relatief = TRUE, titel = NULL) {
       waarde = if (relatief) ifelse(archief >= 50, 1000 * n / archief, NA_real_)
                else n
     )
-  if (length(termen) == 1) df <- df |> filter(term != ALLE_TERMEN_LABEL)
+  if (length(termen) == 1 && !alleen_totaal) {
+    df <- df |> filter(term != ALLE_TERMEN_LABEL)
+  }
   volgorde <- c(if (length(termen) > 1) ALLE_TERMEN_LABEL, termen)
   df$term <- factor(df$term, levels = volgorde)
 

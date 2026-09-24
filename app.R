@@ -1,109 +1,153 @@
 # =============================================================================
 # Kunst & cultuur in de gemeenteraad — dashboard
-# Live data uit Open Raadsinformatie / OpenBesluitvorming.nl + CBS
+# Live data uit Open Raadsinformatie / OpenBesluitvorming.nl + CBS + PDOK
 #
 # Starten:  shiny::runApp("pad/naar/deze/map")
 # Hulpfuncties staan in R/ en worden door Shiny automatisch geladen.
 # =============================================================================
 
+CSS <- "
+mark { background: #f7d6ea; padding: 0 2px; border-radius: 2px; }
+.kerncijfers { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0 16px; }
+.kerncijfer { flex: 1 1 150px; background: #f7f7f9; border-radius: 6px;
+              padding: 10px 14px; }
+.kerncijfer .waarde { font-size: 22px; font-weight: 600; color: #7a1f5c; }
+.kerncijfer .uitleg { font-size: 12px; color: #666; }
+.fragment { border-left: 3px solid #c2378f; padding: 4px 12px; margin: 10px 0; }
+.fragment .meta { font-size: 12px; color: #666; }
+.knoppen { margin: 8px 0; }
+"
+
 # --- UI ----------------------------------------------------------------------
 
-ui <- fluidPage(
-  titlePanel("Kunst & cultuur in Nederlandse gemeenteraden"),
-  sidebarLayout(
-    sidebarPanel(
-      width = 3,
-      selectInput("thema", "Thema",
-                  choices = c("— eigen keuze —" = "", names(THEMASETS))),
-      selectizeInput(
-        "termen", "Zoektermen",
-        choices = TERMEN,
-        selected = STANDAARD_TERMEN,
-        multiple = TRUE,
-        options = list(
-          create = TRUE, persist = TRUE,
-          placeholder = "Kies of typ een term…",
-          plugins = list("remove_button")
-        )
+ui <- function(request) {
+  fluidPage(
+    tags$head(tags$style(HTML(CSS))),
+    titlePanel("Kunst & cultuur in Nederlandse gemeenteraden"),
+    sidebarLayout(
+      sidebarPanel(
+        width = 3,
+        selectInput("thema", "Thema",
+                    choices = c("— eigen keuze —" = "", names(THEMASETS))),
+        selectizeInput(
+          "termen", "Zoektermen",
+          choices = TERMEN,
+          selected = STANDAARD_TERMEN,
+          multiple = TRUE,
+          options = list(
+            create = TRUE, persist = TRUE,
+            placeholder = "Kies of typ een term…",
+            plugins = list("remove_button")
+          )
+        ),
+        helpText("Typ zelf een term of woordgroep (bijv. 'kunst en cultuur')",
+                 "en druk op Enter om hem toe te voegen."),
+        sliderInput("jaren", "Periode (vergaderdatum)",
+                    min = EERSTE_JAAR, max = HUIDIG_JAAR,
+                    value = c(2020, HUIDIG_JAAR), step = 1, sep = ""),
+        checkboxInput("opt_context", "Alleen in cultuurcontext",
+                      value = STANDAARD_OPTIES$context),
+        checkboxInput("opt_dedup", "Dubbele bijlagen samenvoegen",
+                      value = STANDAARD_OPTIES$dedup),
+        checkboxInput("opt_woordvormen", "Ook woordvormen (amateurkunst*)",
+                      value = STANDAARD_OPTIES$woordvormen),
+        helpText(sprintf(paste(
+          "Cultuurcontext: een term telt alleen als binnen %d woorden een",
+          "cultuurwoord staat (cultuur, kunst, muziek, theater, …). Geldt",
+          "niet voor termen die zelf al over cultuur gaan."), CONTEXT_AFSTAND)),
+        actionButton("ophalen", "Haal Live Data Op",
+                     class = "btn-primary", width = "100%"),
+        hr(),
+        radioButtons("maatstaf", "Maatstaf", choices = MAATSTAVEN,
+                     selected = "relatief"),
+        helpText(sprintf(paste(
+          "'Per 1.000 raadsdocumenten' corrigeert voor de omvang van het",
+          "archief (minimaal %d documenten per jaar). 'Per inwoner' telt",
+          "alleen gemeenten vanaf %s inwoners (CBS)."),
+          MIN_DOCS_PER_JAAR, fmt(MIN_INWONERS, 0))),
+        hr(),
+        uiOutput("status"),
+        div(class = "knoppen",
+            bookmarkButton("Link naar deze zoekopdracht",
+                           title = "Maak een link die deze instellingen bewaart")),
+        hr(),
+        helpText("Bronnen: OpenBesluitvorming.nl / Open Raadsinformatie,",
+                 "CBS (inwoners, Iv3-gemeentefinanciën) en PDOK/Kadaster.",
+                 "Telling = aantal raadsdocumenten waarin een term voorkomt.")
       ),
-      helpText("Typ zelf een term of woordgroep (bijv. 'kunst en cultuur')",
-               "en druk op Enter om hem toe te voegen. Er wordt gezocht",
-               "op de exacte woordgroep."),
-      sliderInput("jaren", "Periode (vergaderdatum)",
-                  min = EERSTE_JAAR, max = HUIDIG_JAAR,
-                  value = c(2020, HUIDIG_JAAR), step = 1, sep = ""),
-      checkboxInput("opt_context", "Alleen in cultuurcontext",
-                    value = STANDAARD_OPTIES$context),
-      checkboxInput("opt_dedup", "Dubbele bijlagen samenvoegen",
-                    value = STANDAARD_OPTIES$dedup),
-      checkboxInput("opt_woordvormen", "Ook woordvormen (amateurkunst*)",
-                    value = STANDAARD_OPTIES$woordvormen),
-      helpText(sprintf(paste(
-        "Cultuurcontext: een term telt alleen als binnen %d woorden een",
-        "cultuurwoord staat (cultuur, kunst, muziek, theater, …). Geldt niet",
-        "voor termen die zelf al over cultuur gaan."), CONTEXT_AFSTAND)),
-      actionButton("ophalen", "Haal Live Data Op",
-                   class = "btn-primary", width = "100%"),
-      hr(),
-      radioButtons("maatstaf", "Maatstaf", choices = MAATSTAVEN,
-                   selected = "relatief"),
-      helpText(sprintf(paste(
-        "'Per 1.000 raadsdocumenten' corrigeert voor de omvang van het",
-        "archief; gemeenten met minder dan %d documenten per jaar tellen",
-        "dan niet mee. Inwoners: CBS."), MIN_DOCS_PER_JAAR)),
-      hr(),
-      uiOutput("status"),
-      hr(),
-      helpText("Bron: OpenBesluitvorming.nl / Open Raadsinformatie en CBS.",
-               "Telling = aantal raadsdocumenten waarin een term voorkomt.")
-    ),
-    mainPanel(
-      width = 9,
-      tabsetPanel(
-        id = "tabs",
-        tabPanel(
-          "Kaart & ranking", value = "kaart",
-          br(),
-          leafletOutput("kaart", height = 480),
-          helpText("Klik op een gemeente om de trend te zien. Grijs: geen",
-                   "archief of te weinig documenten voor deze maatstaf."),
-          tableOutput("tabel")
-        ),
-        tabPanel(
-          "Trend", value = "trend",
-          br(),
-          selectInput("trend_gemeente", "Gemeente",
-                      choices = c("Heel Nederland" = "NL"), width = "300px"),
-          plotOutput("trend", height = 420),
-          helpText("Bij 'per 1.000 raadsdocumenten' is de noemer het aantal",
-                   "documenten in dat jaar, zodat groei van het archief niet",
-                   "als groei van aandacht telt. Het lopende jaar is nog niet",
-                   "compleet.")
-        ),
-        tabPanel(
-          "Aandacht vs. budget", value = "budget",
-          br(),
-          plotOutput("budget_plot", height = 520,
-                     hover = hoverOpts("budget_hover", delay = 100)),
-          uiOutput("budget_hover_info"),
-          helpText(sprintf(paste(
-            "Budget: gemeentelijke lasten voor cultuur per inwoner uit de",
-            "jaarrekening %d (CBS Iv3, taakvelden 5.3 cultuur, 5.4 musea,",
-            "5.5 erfgoed en 5.6 media/bibliotheek; inclusief kapitaallasten",
-            "en verrekeningen). Stippellijnen = mediaan. Alleen gemeenten",
-            "met minstens %s inwoners."), IV3_JAAR,
-            fmt(MIN_INWONERS, 0))),
-          tableOutput("budget_tabel")
-        ),
-        tabPanel(
-          sprintf("Documenten (nieuwste %d)", MAX_DOCS), value = "docs",
-          br(),
-          tableOutput("documenten")
+      mainPanel(
+        width = 9,
+        tabsetPanel(
+          id = "tabs",
+          tabPanel(
+            "Kaart & ranking", value = "kaart",
+            br(),
+            leafletOutput("kaart", height = 520),
+            helpText("Klik op een gemeente voor het gemeenteprofiel. Grijs:",
+                     "geen archief of te weinig documenten voor deze maatstaf."),
+            div(class = "knoppen",
+                downloadButton("dl_ranking", "Ranking (CSV)")),
+            tableOutput("tabel")
+          ),
+          tabPanel(
+            "Trend", value = "trend",
+            br(),
+            selectizeInput(
+              "trend_gebieden", "Vergelijk (maximaal 4)",
+              choices = c("Heel Nederland" = "NL"), selected = "NL",
+              multiple = TRUE, width = "100%",
+              options = list(maxItems = 4, plugins = list("remove_button"))
+            ),
+            plotOutput("trend", height = 520),
+            div(class = "knoppen",
+                downloadButton("dl_trend", "Grafiek (PNG)")),
+            helpText("Elke term heeft een eigen schaal. Bij 'per 1.000",
+                     "raadsdocumenten' is de noemer het aantal documenten in",
+                     "dat jaar, zodat groei van het archief niet als groei",
+                     "van aandacht telt. Het lopende jaar is nog niet compleet.")
+          ),
+          tabPanel(
+            "Gemeenteprofiel", value = "profiel",
+            br(),
+            selectInput("profiel_gemeente", "Gemeente", choices = NULL),
+            uiOutput("profiel_kerncijfers"),
+            fluidRow(
+              column(7, plotOutput("profiel_trend", height = 400)),
+              column(5, plotOutput("profiel_budget", height = 400))
+            ),
+            h4("Waar gaat het over? De nieuwste vermeldingen"),
+            uiOutput("profiel_fragmenten")
+          ),
+          tabPanel(
+            "Aandacht vs. budget", value = "budget",
+            br(),
+            selectInput("budget_keuze", "Budget", choices = IV3_KEUZES),
+            plotOutput("budget_plot", height = 560,
+                       hover = hoverOpts("budget_hover", delay = 100)),
+            uiOutput("budget_hover_info"),
+            div(class = "knoppen",
+                downloadButton("dl_budget_png", "Grafiek (PNG)"),
+                downloadButton("dl_budget_csv", "Gegevens (CSV)")),
+            helpText(sprintf(paste(
+              "Budget: gemeentelijke lasten voor cultuur per inwoner (CBS Iv3,",
+              "taakvelden 5.3 cultuur, 5.4 musea, 5.5 erfgoed en 5.6",
+              "media/bibliotheek; inclusief kapitaallasten en verrekeningen).",
+              "Stippellijnen = mediaan. Alleen gemeenten met minstens %s",
+              "inwoners."), fmt(MIN_INWONERS, 0))),
+            tableOutput("budget_tabel")
+          ),
+          tabPanel(
+            sprintf("Documenten (nieuwste %d)", MAX_DOCS), value = "docs",
+            br(),
+            div(class = "knoppen",
+                downloadButton("dl_docs", "Documenten (CSV)")),
+            tableOutput("documenten")
+          )
         )
       )
     )
   )
-)
+}
 
 # --- Server ------------------------------------------------------------------
 
@@ -111,6 +155,8 @@ server <- function(input, output, session) {
 
   resultaat <- reactiveVal(NULL)
   foutmelding <- reactiveVal(NULL)
+
+  # --- Ophalen ---
 
   observeEvent(input$thema, {
     req(nzchar(input$thema))
@@ -123,14 +169,13 @@ server <- function(input, output, session) {
     dedup = isTRUE(input$opt_dedup)
   ))
 
-  observeEvent(input$ophalen, {
-    # Alleen letters, cijfers, spaties, koppel- en apostroftekens
-    termen <- gsub("[^[:alnum:] '-]", "", tolower(trimws(input$termen)))
-    termen <- unique(gsub("\\s+", " ", trimws(termen)))
-    termen <- termen[nchar(termen) >= 2]
+  # Ook gebruikt bij het openen van een gedeelde link (zie onRestored)
+  doe_ophalen <- function(termen, jaren, opties,
+                          trend_selectie = NULL, profiel_selectie = NULL) {
+    termen <- schoon_termen(termen)
     if (length(termen) == 0) {
       showNotification("Kies minstens één zoekterm.", type = "warning")
-      return()
+      return(invisible(FALSE))
     }
 
     id <- showNotification("Live data ophalen…", duration = NULL,
@@ -139,14 +184,9 @@ server <- function(input, output, session) {
 
     res <- withCallingHandlers(
       tryCatch(
-        haal_data_op(termen, input$jaren, zoekopties()),
+        haal_data_op(termen, jaren, opties),
         httr2_failure = function(e) {
           foutmelding(paste("Geen verbinding met de API:", conditionMessage(e)))
-          NULL
-        },
-        httr2_http_429 = function(e) {
-          foutmelding(paste("De API krijgt even te veel verzoeken.",
-                            "Probeer het over een minuut opnieuw."))
           NULL
         },
         error = function(e) {
@@ -155,28 +195,72 @@ server <- function(input, output, session) {
         }
       ),
       warning = function(w) {
-        showNotification(conditionMessage(w), type = "warning", duration = 8)
+        showNotification(conditionMessage(w), type = "warning", duration = 10)
         invokeRestart("muffleWarning")
       }
     )
 
     if (is.null(res)) {
-      showNotification(foutmelding(), type = "error", duration = 8)
-      return()
+      showNotification(foutmelding(), type = "error", duration = 10)
+      return(invisible(FALSE))
     }
     foutmelding(NULL)
     resultaat(res)
 
     met_treffers <- res$per_gemeente |> filter(totaal > 0) |> arrange(gemeente)
-    updateSelectInput(session, "trend_gemeente", choices = c(
-      "Heel Nederland" = "NL",
-      setNames(met_treffers$key, met_treffers$gemeente)
-    ), selected = isolate(input$trend_gemeente))
+    keuzes <- setNames(met_treffers$key, met_treffers$gemeente)
+    trend_selectie <- trend_selectie %||% isolate(input$trend_gebieden)
+    updateSelectizeInput(
+      session, "trend_gebieden",
+      choices = c("Heel Nederland" = "NL", keuzes),
+      selected = intersect(trend_selectie %||% "NL", c("NL", keuzes))
+    )
+    profiel_selectie <- profiel_selectie %||% isolate(input$profiel_gemeente)
+    updateSelectInput(
+      session, "profiel_gemeente", choices = keuzes,
+      selected = if (isTRUE(profiel_selectie %in% keuzes)) profiel_selectie
+                 else met_treffers$key[which.max(met_treffers$totaal)]
+    )
     if (nrow(met_treffers) == 0) {
       showNotification("Geen resultaten gevonden voor deze termen.",
                        type = "warning")
     }
+    invisible(TRUE)
+  }
+
+  observeEvent(input$ophalen, {
+    doe_ophalen(input$termen, input$jaren, zoekopties())
   })
+
+  # --- Deelbare links (bookmarking via de URL) ---
+
+  setBookmarkExclude(c(
+    "ophalen", "thema", "budget_hover",
+    "kaart_bounds", "kaart_center", "kaart_zoom", "kaart_shape_click",
+    "kaart_shape_mouseover", "kaart_shape_mouseout", "kaart_click",
+    "trend_gebieden", "profiel_gemeente"
+  ))
+  # Keuzelijsten die pas na het ophalen gevuld zijn, bewaren we apart
+  onBookmark(function(state) {
+    state$values$trend <- input$trend_gebieden
+    state$values$profiel <- input$profiel_gemeente
+    state$values$opgehaald <- !is.null(resultaat())
+  })
+  onRestored(function(state) {
+    if (isTRUE(state$values$opgehaald)) {
+      doe_ophalen(state$input$termen, state$input$jaren, list(
+        context = isTRUE(state$input$opt_context),
+        woordvormen = isTRUE(state$input$opt_woordvormen),
+        dedup = isTRUE(state$input$opt_dedup)
+      ), trend_selectie = unlist(state$values$trend),
+      profiel_selectie = unlist(state$values$profiel))
+    }
+  })
+  onBookmarked(function(url) {
+    showBookmarkUrlModal(url)
+  })
+
+  # --- Status ---
 
   output$status <- renderUI({
     if (!is.null(foutmelding())) {
@@ -237,113 +321,201 @@ server <- function(input, output, session) {
   observeEvent(input$kaart_shape_click, {
     res <- resultaat()
     req(res)
-    key <- res$per_gemeente$key[
-      res$per_gemeente$gemeentecode %in% input$kaart_shape_click$id]
-    if (length(key) == 0) {
-      showNotification("Van deze gemeente is geen raadsarchief beschikbaar.",
+    rij <- res$per_gemeente |>
+      filter(gemeentecode %in% input$kaart_shape_click$id, totaal > 0)
+    if (nrow(rij) == 0) {
+      showNotification("Geen treffers of geen raadsarchief voor deze gemeente.",
                        type = "warning")
       return()
     }
-    updateSelectInput(session, "trend_gemeente", selected = key[1])
-    updateTabsetPanel(session, "tabs", selected = "trend")
+    updateSelectInput(session, "profiel_gemeente", selected = rij$key[1])
+    updateTabsetPanel(session, "tabs", selected = "profiel")
   })
 
-  # --- Tabel ---
+  # --- Ranking ---
+
+  ranking_tabel <- reactive({
+    res <- resultaat()
+    gerangschikt() |>
+      transmute(
+        Rang = row_number(),
+        Gemeente = gemeente,
+        `Per 1.000 docs` = per_1000,
+        `Per 100k inw./jaar` = per_100k,
+        Totaal = totaal,
+        across(all_of(res$termen)),
+        `Archief (docs)` = archief,
+        Inwoners = inwoners
+      )
+  })
 
   output$tabel <- renderTable({
-    res <- resultaat()
-    df <- gerangschikt()
+    df <- ranking_tabel()
     shiny::validate(need(nrow(df) > 0, "Geen resultaten."))
     df |>
       head(25) |>
-      mutate(across(all_of(res$termen), \(x) fmt(x, 0))) |>
-      transmute(
-        `#` = row_number(),
-        Gemeente = gemeente,
-        `Per 1.000 docs` = fmt(per_1000),
-        `Per 100k inw./jaar` = fmt(per_100k),
-        Totaal = fmt(totaal, 0),
-        across(all_of(res$termen)),
-        `Archief (docs)` = fmt(archief, 0),
-        Inwoners = fmt(inwoners, 0)
-      )
+      mutate(across(c(`Per 1.000 docs`, `Per 100k inw./jaar`), fmt),
+             across(-c(Rang, Gemeente, `Per 1.000 docs`, `Per 100k inw./jaar`),
+                    \(x) fmt(x, 0)))
   }, striped = TRUE, hover = TRUE, align = "l")
+
+  output$dl_ranking <- downloadHandler(
+    filename = \() sprintf("cultuur-ranking-%s.csv", Sys.Date()),
+    content = \(file) schrijf_csv(ranking_tabel(), file)
+  )
 
   # --- Trend ---
 
-  trend_data <- reactive({
-    res <- resultaat()
-    req(res, input$trend_gemeente)
-    if (input$trend_gemeente == "NL") {
-      return(list(data = res$jaren_nl, naam = "heel Nederland"))
+  # Trendcijfers per gemeente; ORI-antwoorden worden al gecachet in post_json
+  trend_voor <- function(key, res) {
+    if (key == "NL") {
+      return(res$jaren_nl |> mutate(gebied = "Nederland"))
     }
-    rij <- res$per_gemeente |> filter(key == input$trend_gemeente)
-    req(nrow(rij) == 1)
-    data <- tryCatch(
-      haal_trend_gemeente(rij$ruw[[1]], res$termen, res$jaren, res$opties),
+    rij <- res$per_gemeente |> filter(key == !!key)
+    if (nrow(rij) != 1) return(NULL)
+    tryCatch(
+      haal_trend_gemeente(rij$ruw[[1]], res$termen, res$jaren, res$opties) |>
+        mutate(gebied = rij$gemeente),
       error = function(e) {
-        showNotification(paste("Trend ophalen mislukt:", conditionMessage(e)),
+        showNotification(sprintf("Trend voor %s ophalen mislukt: %s",
+                                 rij$gemeente, conditionMessage(e)),
                          type = "error", duration = 8)
         NULL
       }
     )
-    req(data)
-    list(data = data, naam = rij$gemeente)
+  }
+
+  trend_plot <- reactive({
+    res <- resultaat()
+    req(res, length(input$trend_gebieden) > 0)
+    df <- bind_rows(lapply(input$trend_gebieden, trend_voor, res = res))
+    shiny::validate(need(nrow(df) > 0 && any(df$n > 0),
+                         "Geen treffers in deze periode."))
+    df$gebied <- factor(df$gebied, levels = unique(df$gebied))
+    plot_trend(df, res$termen, res$jaren,
+               relatief = input$maatstaf != "absoluut",
+               titel = sprintf("Aandacht voor %s",
+                               paste(res$termen, collapse = ", ")))
   })
 
-  output$trend <- renderPlot({
-    td <- trend_data()
-    res <- resultaat()
-    relatief <- input$maatstaf != "absoluut"
+  output$trend <- renderPlot(trend_plot())
 
-    df <- td$data |>
-      mutate(
-        term = ifelse(term == "__alle__", "Alle gekozen termen", term),
-        waarde = if (relatief) {
-          # jaren met heel weinig documenten geven wilde uitschieters
-          ifelse(archief >= 50, 1000 * n / archief, NA_real_)
-        } else n
+  output$dl_trend <- downloadHandler(
+    filename = \() sprintf("cultuur-trend-%s.png", Sys.Date()),
+    content = \(file) ggsave(file, trend_plot(), width = 12, height = 7,
+                             dpi = 150, bg = "white")
+  )
+
+  # --- Budget (CBS Iv3), per keuze één keer ophalen ---
+
+  lasten_cache <- reactiveValues()
+  lasten_voor <- function(keuze) {
+    if (is.null(lasten_cache[[keuze]])) {
+      id <- showNotification(sprintf("Cultuurbudgetten ophalen bij CBS (%s)…",
+                                     names(IV3_KEUZES)[IV3_KEUZES == keuze]),
+                             duration = NULL, closeButton = FALSE)
+      on.exit(removeNotification(id), add = TRUE)
+      lasten_cache[[keuze]] <- tryCatch(
+        haal_cultuurlasten(keuze),
+        error = function(e) {
+          showNotification(paste("CBS-budgetdata ophalen mislukt:",
+                                 conditionMessage(e)),
+                           type = "error", duration = 10)
+          NULL
+        }
       )
-    if (length(res$termen) == 1) df <- df |> filter(term != "Alle gekozen termen")
-    shiny::validate(need(any(df$waarde > 0, na.rm = TRUE),
-                         "Geen treffers in deze periode."))
+    }
+    lasten_cache[[keuze]]
+  }
 
-    ggplot(df, aes(jaar, waarde, colour = term)) +
-      geom_line(aes(linewidth = term == "Alle gekozen termen"), na.rm = TRUE) +
-      geom_point(size = 2, na.rm = TRUE) +
-      scale_linewidth_manual(values = c(`FALSE` = 0.8, `TRUE` = 1.6),
-                             guide = "none") +
-      scale_x_continuous(breaks = seq(res$jaren[1], res$jaren[2], by = 1)) +
-      scale_y_continuous(labels = \(x) fmt(x, if (relatief) 1 else 0),
-                         limits = c(0, NA)) +
-      labs(
-        title = sprintf("Trend in %s", td$naam),
-        x = NULL, colour = NULL,
-        y = if (relatief) "Documenten per 1.000 raadsdocumenten"
-            else "Aantal documenten"
-      ) +
-      theme_minimal(base_size = 14) +
-      theme(legend.position = "bottom", panel.grid.minor = element_blank())
+  # --- Gemeenteprofiel ---
+
+  profiel_rij <- reactive({
+    res <- resultaat()
+    shiny::validate(need(res, "Haal eerst live data op."))
+    req(input$profiel_gemeente)
+    rij <- res$per_gemeente |> filter(key == input$profiel_gemeente)
+    req(nrow(rij) == 1)
+    rij
+  })
+
+  output$profiel_kerncijfers <- renderUI({
+    rij <- profiel_rij()
+    rang <- function(kolom) {
+      alle <- resultaat()$per_gemeente |>
+        filter(totaal > 0, !is.na(.data[[kolom]]))
+      if (is.na(rij[[kolom]])) return("niet gerangschikt")
+      sprintf("rang %d van %d", sum(alle[[kolom]] > rij[[kolom]]) + 1,
+              nrow(alle))
+    }
+    # Reactief: verschijnt zodra de budgetgrafiek de CBS-data heeft opgehaald
+    budget <- lasten_cache[[IV3_KEUZES[[1]]]]
+    euro <- if (!is.null(budget)) {
+      budget$cultuur_per_inw[budget$gemeentecode %in% rij$gemeentecode][1]
+    }
+    blok <- function(waarde, uitleg) {
+      div(class = "kerncijfer", div(class = "waarde", waarde),
+          div(class = "uitleg", uitleg))
+    }
+    div(class = "kerncijfers",
+        blok(fmt(rij$per_1000),
+             paste("per 1.000 raadsdocumenten ·", rang("per_1000"))),
+        blok(fmt(rij$per_100k),
+             paste("per 100.000 inwoners per jaar ·", rang("per_100k"))),
+        blok(fmt(rij$totaal, 0), "documenten met een treffer"),
+        blok(fmt(rij$inwoners, 0), "inwoners (CBS)"),
+        if (!is.null(euro)) {
+          blok(paste0("€", fmt(euro, 0)),
+               paste("cultuur per inwoner,", names(IV3_KEUZES)[1]))
+        })
+  })
+
+  output$profiel_trend <- renderPlot({
+    rij <- profiel_rij()
+    res <- resultaat()
+    df <- bind_rows(trend_voor(rij$key, res), trend_voor("NL", res))
+    shiny::validate(need(nrow(df) > 0, "Geen trendgegevens."))
+    df$gebied <- factor(df$gebied, levels = unique(df$gebied))
+    # Alleen het totaal van de gekozen termen: past beter in de halve breedte
+    plot_trend(df, res$termen, res$jaren,
+               relatief = input$maatstaf != "absoluut",
+               titel = "Aandacht door de jaren", alleen_totaal = TRUE)
+  })
+
+  output$profiel_budget <- renderPlot({
+    rij <- profiel_rij()
+    req(input$tabs == "profiel")
+    lasten <- bind_rows(lapply(IV3_KEUZES, lasten_voor))
+    shiny::validate(need(nrow(lasten) > 0, "Budgetgegevens niet beschikbaar."),
+                    need(!is.na(rij$gemeentecode), "Geen CBS-gemeentecode."))
+    plot_budget_trend(lasten, rij$gemeentecode, rij$gemeente)
+  })
+
+  output$profiel_fragmenten <- renderUI({
+    rij <- profiel_rij()
+    res <- resultaat()
+    frag <- tryCatch(
+      haal_fragmenten(rij$ruw[[1]], res$termen, res$jaren, res$opties),
+      error = function(e) {
+        tags$p(class = "text-danger",
+               paste("Fragmenten ophalen mislukt:", conditionMessage(e)))
+      }
+    )
+    if (inherits(frag, "shiny.tag")) return(frag)
+    if (nrow(frag) == 0) return(helpText("Geen vermeldingen gevonden."))
+    tagList(lapply(seq_len(nrow(frag)), function(i) {
+      f <- frag[i, ]
+      link <- veilige_link(f$link)
+      div(class = "fragment",
+          div(class = "meta", f$datum, " · ",
+              if (nzchar(link)) tags$a(href = link, target = "_blank", f$titel)
+              else f$titel),
+          # Door ES ge-escaped; alleen onze <mark>-tags zijn HTML
+          if (nzchar(f$fragmenten)) tags$p(HTML(f$fragmenten)))
+    }))
   })
 
   # --- Aandacht vs. budget ---
-
-  # Iv3-data pas ophalen als iemand het tabblad opent (duurt 5-10 s)
-  lasten <- reactiveVal(NULL)
-  observeEvent(input$tabs, {
-    req(input$tabs == "budget", is.null(lasten()))
-    id <- showNotification("Cultuurbudgetten ophalen bij CBS…",
-                           duration = NULL, closeButton = FALSE)
-    on.exit(removeNotification(id), add = TRUE)
-    tryCatch(
-      lasten(haal_cultuurlasten()),
-      error = function(e) {
-        showNotification(paste("CBS-budgetdata ophalen mislukt:",
-                               conditionMessage(e)),
-                         type = "error", duration = 10)
-      }
-    )
-  })
 
   aandacht_kolom <- reactive({
     if (input$maatstaf == "inwoners") "per_100k" else "per_1000"
@@ -359,70 +531,20 @@ server <- function(input, output, session) {
   budget_df <- reactive({
     res <- resultaat()
     shiny::validate(need(res, "Haal eerst live data op."))
-    shiny::validate(need(lasten(), "Budgetdata nog niet beschikbaar."))
-    df <- res$per_gemeente |>
-      filter(!is.na(inwoners), inwoners >= MIN_INWONERS) |>
-      inner_join(lasten(), by = "gemeentecode") |>
-      mutate(aandacht = .data[[aandacht_kolom()]]) |>
-      filter(!is.na(aandacht), !is.na(cultuur_per_inw))
+    req(input$tabs == "budget" || !is.null(lasten_cache[[input$budget_keuze]]))
+    lasten <- lasten_voor(input$budget_keuze)
+    shiny::validate(need(lasten, "Budgetdata niet beschikbaar."))
+    df <- maak_budget_df(res$per_gemeente, lasten, aandacht_kolom())
     shiny::validate(need(nrow(df) >= 5, "Te weinig gemeenten om te vergelijken."))
-
-    # Verschil in percentielrang: positief = veel aandacht t.o.v. budget
-    df |>
-      mutate(
-        rang_aandacht = percent_rank(aandacht),
-        rang_budget = percent_rank(cultuur_per_inw),
-        verschil = rang_aandacht - rang_budget,
-        profiel = case_when(
-          aandacht >= median(aandacht) & cultuur_per_inw < median(cultuur_per_inw) ~
-            "Veel aandacht, weinig budget",
-          aandacht < median(aandacht) & cultuur_per_inw >= median(cultuur_per_inw) ~
-            "Veel budget, weinig aandacht",
-          aandacht >= median(aandacht) ~ "Veel aandacht, veel budget",
-          TRUE ~ "Weinig aandacht, weinig budget"
-        )
-      )
+    df
   })
 
-  output$budget_plot <- renderPlot({
-    df <- budget_df()
-    rho <- suppressWarnings(cor(df$aandacht, df$cultuur_per_inw,
-                                method = "spearman"))
-    labels <- df |>
-      filter(rank(-aandacht) <= 6 | rank(-cultuur_per_inw) <= 4 |
-               rank(-abs(verschil)) <= 6)
-
-    ggplot(df, aes(cultuur_per_inw, aandacht)) +
-      geom_vline(xintercept = median(df$cultuur_per_inw), linetype = "dashed",
-                 colour = "grey60") +
-      geom_hline(yintercept = median(df$aandacht), linetype = "dashed",
-                 colour = "grey60") +
-      geom_point(aes(size = inwoners, colour = profiel), alpha = 0.7) +
-      ggrepel::geom_text_repel(data = labels, aes(label = gemeente),
-                               size = 3.8, max.overlaps = 30,
-                               min.segment.length = 0) +
-      scale_x_log10(labels = \(x) paste0("€", fmt(x, 0))) +
-      scale_size_area(max_size = 12, guide = "none") +
-      scale_colour_manual(values = c(
-        "Veel aandacht, weinig budget" = "#c2378f",
-        "Veel budget, weinig aandacht" = "#2b7bba",
-        "Veel aandacht, veel budget"   = "#5a3e8c",
-        "Weinig aandacht, weinig budget" = "grey55"
-      )) +
-      labs(
-        title = "Praat de raad over cultuur in verhouding tot wat de gemeente eraan uitgeeft?",
-        subtitle = sprintf(
-          "%d gemeenten · %d–%d · Spearman-correlatie: %s",
-          nrow(df), resultaat()$jaren[1], resultaat()$jaren[2],
-          fmt(rho, 2)),
-        x = sprintf("Lasten cultuur per inwoner, %d (logaritmische schaal)",
-                    IV3_JAAR),
-        y = aandacht_label(), colour = NULL
-      ) +
-      theme_minimal(base_size = 14) +
-      theme(legend.position = "bottom", panel.grid.minor = element_blank(),
-            plot.title = element_text(size = 14, face = "bold"))
+  budget_plot <- reactive({
+    plot_budget(budget_df(), resultaat()$jaren, aandacht_label(),
+                names(IV3_KEUZES)[IV3_KEUZES == input$budget_keuze])
   })
+
+  output$budget_plot <- renderPlot(budget_plot())
 
   output$budget_hover_info <- renderUI({
     df <- budget_df()
@@ -460,6 +582,24 @@ server <- function(input, output, session) {
   caption = "Grootste verschillen tussen aandacht en budget (percentielrang 0–100)",
   caption.placement = "top")
 
+  output$dl_budget_png <- downloadHandler(
+    filename = \() sprintf("cultuur-aandacht-vs-budget-%s.png", Sys.Date()),
+    content = \(file) ggsave(file, budget_plot(), width = 12, height = 8,
+                             dpi = 150, bg = "white")
+  )
+  output$dl_budget_csv <- downloadHandler(
+    filename = \() sprintf("cultuur-aandacht-vs-budget-%s.csv", Sys.Date()),
+    content = \(file) schrijf_csv(
+      budget_df() |>
+        transmute(Gemeente = gemeente, Gemeentecode = gemeentecode,
+                  Inwoners = inwoners, Aandacht = aandacht,
+                  `Cultuur euro per inwoner` = cultuur_per_inw,
+                  Profiel = profiel,
+                  `Percentiel aandacht` = 100 * rang_aandacht,
+                  `Percentiel budget` = 100 * rang_budget),
+      file)
+  )
+
   # --- Documenten ---
 
   output$documenten <- renderTable({
@@ -467,14 +607,23 @@ server <- function(input, output, session) {
     req(res)
     shiny::validate(need(nrow(res$docs) > 0, "Geen documenten."))
     res$docs |>
-      mutate(titel = ifelse(
-        nzchar(link),
-        sprintf('<a href="%s" target="_blank">%s</a>',
-                htmltools::htmlEscape(link, attribute = TRUE),
-                htmltools::htmlEscape(titel)),
-        htmltools::htmlEscape(titel))) |>
+      mutate(link = veilige_link(link),
+             titel = ifelse(
+               nzchar(link),
+               sprintf('<a href="%s" target="_blank">%s</a>',
+                       htmltools::htmlEscape(link, attribute = TRUE),
+                       htmltools::htmlEscape(titel)),
+               htmltools::htmlEscape(titel))) |>
       select(Gemeente = gemeente, Datum = datum, Document = titel)
   }, striped = TRUE, sanitize.text.function = identity)
+
+  output$dl_docs <- downloadHandler(
+    filename = \() sprintf("cultuur-documenten-%s.csv", Sys.Date()),
+    content = \(file) schrijf_csv(
+      resultaat()$docs |>
+        select(Gemeente = gemeente, Datum = datum, Titel = titel, Link = link),
+      file)
+  )
 }
 
-shinyApp(ui, server)
+shinyApp(ui, server, enableBookmarking = "url")
