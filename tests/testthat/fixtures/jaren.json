@@ -1,0 +1,7 @@
+[
+  {"key_as_string": "2024-01-01T00:00:00.000000", "doc_count": 1000,
+   "t": {"buckets": {"__alle__": {"doc_count": 12}, "amateurkunst": {"doc_count": 7},
+                     "cultuurbeoefening": {"doc_count": 5}}}},
+  {"key_as_string": "2025-01-01T00:00:00.000000", "doc_count": 2000,
+   "t": {"buckets": {"__alle__": {"doc_count": 0}, "amateurkunst": {"doc_count": 0}}}}
+]
