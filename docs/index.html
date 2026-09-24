@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cultuur in de raad</title>
+  <meta name="description" content="Dashboard dat live Nederlandse raadsdocumenten doorzoekt op kunst- en cultuurthema's en de aandacht naast het cultuurbudget van gemeenten zet.">
+  <style>
+    :root {
+      --bg: #fbfaf9;
+      --tekst: #1f1d1d;
+      --zacht: #5c5657;
+      --accent: #a3276f;
+      --accent-zacht: #f7e3ee;
+      --kaart: #ffffff;
+      --rand: #e8e2e4;
+      --max: 1040px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #151314;
+        --tekst: #efeaec;
+        --zacht: #b3a9ad;
+        --accent: #e577b5;
+        --accent-zacht: #3a1f2e;
+        --kaart: #1f1c1e;
+        --rand: #342e31;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #151314;
+      --tekst: #efeaec;
+      --zacht: #b3a9ad;
+      --accent: #e577b5;
+      --accent-zacht: #3a1f2e;
+      --kaart: #1f1c1e;
+      --rand: #342e31;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--tekst);
+      font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main, header, footer { max-width: var(--max); margin: 0 auto; padding: 0 16px; }
+    header { padding-top: 56px; padding-bottom: 24px; }
+    .label {
+      display: inline-block; font-size: 13px; font-weight: 600; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--accent); margin-bottom: 8px;
+    }
+    h1 { font-size: clamp(32px, 6vw, 52px); line-height: 1.1; margin: 0 0 16px; }
+    h2 { font-size: 24px; margin: 48px 0 12px; }
+    p.intro { font-size: 19px; color: var(--zacht); max-width: 46em; margin: 0; }
+    .knoppen { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+    .knop {
+      display: inline-block; padding: 10px 18px; border-radius: 8px; font-weight: 600;
+      text-decoration: none; border: 1px solid var(--accent);
+    }
+    .knop.primair { background: var(--accent); color: var(--bg); }
+    .knop.secundair { color: var(--accent); }
+    figure { margin: 24px 0; }
+    figure img {
+      width: 100%; height: auto; display: block; border-radius: 10px;
+      border: 1px solid var(--rand); background: #fff;
+    }
+    figcaption { font-size: 14px; color: var(--zacht); margin-top: 8px; }
+    .raster { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+    .blok {
+      background: var(--kaart); border: 1px solid var(--rand); border-radius: 10px;
+      padding: 16px 18px;
+    }
+    .blok h3 { margin: 0 0 6px; font-size: 17px; }
+    .blok p { margin: 0; color: var(--zacht); font-size: 15px; }
+    .cijfer { font-size: 30px; font-weight: 700; color: var(--accent); line-height: 1.2; }
+    ul { padding-left: 20px; }
+    li { margin: 6px 0; }
+    code {
+      background: var(--accent-zacht); padding: 1px 6px; border-radius: 4px;
+      font-size: 15px;
+    }
+    pre {
+      background: var(--kaart); border: 1px solid var(--rand); border-radius: 10px;
+      padding: 14px 16px; overflow-x: auto; font-size: 14px;
+    }
+    pre code { background: none; padding: 0; }
+    a { color: var(--accent); }
+    footer { color: var(--zacht); font-size: 14px; padding-top: 32px; padding-bottom: 48px; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="label">Open data · R Shiny</span>
+    <h1>Cultuur in de raad</h1>
+    <p class="intro">
+      Hoe vaak praten Nederlandse gemeenteraden over amateurkunst,
+      cultuureducatie en cultuurbeoefening? En past die aandacht bij wat een
+      gemeente aan cultuur uitgeeft? Dit dashboard doorzoekt live de
+      raadsdocumenten van zo'n 290 gemeenten en zet ze naast open data van
+      het CBS.
+    </p>
+    <div class="knoppen">
+      <a class="knop primair" href="{{REPO_URL}}">Code op GitHub</a>
+      <a class="knop secundair" href="{{REPO_URL}}#starten">Zelf starten</a>
+    </div>
+  </header>
+
+  <main>
+    <figure>
+      <img src="img/kaart.png" alt="Kaart van Nederland met gemeenten ingekleurd naar het aantal raadsdocumenten over cultuurthema's per 1.000 documenten, met daaronder een ranking.">
+      <figcaption>Aandacht voor amateurkunst, cultuurbeoefening en talentontwikkeling per 1.000 raadsdocumenten, 2020–2026.</figcaption>
+    </figure>
+
+    <h2>Wat kun je ermee?</h2>
+    <div class="raster">
+      <div class="blok">
+        <h3>Kaart en ranking</h3>
+        <p>Alle gemeenten ingekleurd: per 1.000 raadsdocumenten, per 100.000 inwoners of absoluut.</p>
+      </div>
+      <div class="blok">
+        <h3>Trend en vergelijken</h3>
+        <p>Een eigen grafiek per term, voor tot vier gemeenten naast heel Nederland.</p>
+      </div>
+      <div class="blok">
+        <h3>Gemeenteprofiel</h3>
+        <p>Kerncijfers, cultuurlasten 2023–2026 en de zinnen waarin de termen voorkomen.</p>
+      </div>
+      <div class="blok">
+        <h3>Aandacht vs. budget</h3>
+        <p>Welke gemeenten praten veel over cultuur maar geven er weinig aan uit, en omgekeerd?</p>
+      </div>
+    </div>
+
+    <figure>
+      <img src="img/profiel.png" alt="Gemeenteprofiel van Tilburg met kerncijfers, een trendlijn naast Nederland, cultuurlasten per inwoner naast de mediaan, en de nieuwste raadsdocumenten met gemarkeerde zinnen.">
+      <figcaption>Gemeenteprofiel: kerncijfers, trend, budget en de nieuwste vermeldingen met gemarkeerde zinnen.</figcaption>
+    </figure>
+
+    <h2>Eerlijker tellen</h2>
+    <div class="raster">
+      <div class="blok">
+        <div class="cijfer">±20%</div>
+        <p>van de treffers is dezelfde bijlage bij meerdere agendapunten. Die worden samengevoegd.</p>
+      </div>
+      <div class="blok">
+        <div class="cijfer">2/3</div>
+        <p>van de treffers voor <em>talentontwikkeling</em> gaat niet over cultuur. Een contextfilter houdt alleen vermeldingen dicht bij cultuurwoorden over.</p>
+      </div>
+      <div class="blok">
+        <div class="cijfer">per jaar</div>
+        <p>wordt gedeeld door het aantal documenten in dat jaar, zodat groei van het archief niet als groei van aandacht telt.</p>
+      </div>
+    </div>
+
+    <figure>
+      <img src="img/trend.png" alt="Lijngrafieken per zoekterm met de aandacht per jaar voor Nederland, Tilburg en Utrecht.">
+      <figcaption>Trend per term, met Tilburg en Utrecht naast heel Nederland.</figcaption>
+    </figure>
+
+    <figure>
+      <img src="img/budget.png" alt="Spreidingsdiagram met cultuurlasten per inwoner op de horizontale as en aandacht in de raad op de verticale as, met gemeenten ingedeeld in vier profielen.">
+      <figcaption>Aandacht in de raad naast de cultuurlasten per inwoner (jaarrekening 2024).</figcaption>
+    </figure>
+
+    <h2 id="starten">Zelf starten</h2>
+    <p>Je hebt R 4.4 of nieuwer nodig. Installeer de pakketten en start de app vanuit de map van het project:</p>
+<pre><code>install.packages(c("shiny", "httr2", "jsonlite", "dplyr", "tidyr", "leaflet",
+                   "ggplot2", "ggrepel", "cbsodataR", "sf", "cachem"))
+shiny::runApp()</code></pre>
+
+    <h2>Kanttekeningen</h2>
+    <ul>
+      <li>51 van de 342 gemeenten hebben geen archief in OpenBesluitvorming.</li>
+      <li>Archieven gaan niet overal even ver terug. Vergelijk daarom binnen één periode.</li>
+      <li>Een vermelding is geen beleid: het kan om een bijlage of een verworpen motie gaan. Het gemeenteprofiel toont de zinnen, zodat je dat kunt nagaan.</li>
+      <li>Het cultuurbudget is een indicatie: kapitaallasten en verrekeningen tellen mee.</li>
+    </ul>
+  </main>
+
+  <footer>
+    Bronnen: <a href="https://openbesluitvorming.nl">OpenBesluitvorming.nl</a> / Open State Foundation,
+    <a href="https://www.cbs.nl">CBS</a> (CC BY 4.0) en <a href="https://www.pdok.nl">PDOK</a> / Kadaster.
+    Code onder de MIT-licentie.
+  </footer>
+</body>
+</html>
