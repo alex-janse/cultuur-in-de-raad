@@ -1,0 +1,8 @@
+# R
+.Rhistory
+.RData
+.Rproj.user/
+rsconnect/
+
+# Lokale cache van CBS/PDOK-data
+cache/
