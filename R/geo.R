@@ -11,7 +11,7 @@ GEO_URL <- paste0(
 # vereenvoudigd tot ~250 m zodat de kaart vlot laadt. 90 dagen op schijf.
 haal_gemeentegrenzen <- function() {
   schijf_cache("gemeentegrenzen", max_dagen = 90, function() {
-    for (jaar in c(HUIDIG_JAAR, HUIDIG_JAAR - 1)) {
+    for (jaar in c(huidig_jaar(), huidig_jaar() - 1)) {
       bestand <- tempfile(fileext = ".geojson")
       ok <- tryCatch({
         request(sprintf(GEO_URL, jaar)) |> req_timeout(60) |>

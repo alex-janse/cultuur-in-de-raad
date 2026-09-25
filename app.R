@@ -18,6 +18,31 @@ mark { background: #f7d6ea; padding: 0 2px; border-radius: 2px; }
 .knoppen { margin: 8px 0; }
 "
 
+# --- Achtergrondproces voor live zoeken --------------------------------------
+# Een live zoekvraag duurt 5-15 s. In een apart R-proces (mirai) blijft de
+# app intussen voor alle bezoekers bruikbaar. Met options(cultuur.async =
+# FALSE) draait alles in het hoofdproces (handig voor tests).
+ASYNC <- getOption("cultuur.async", TRUE)
+if (ASYNC) {
+  # Lukt het starten niet (bv. een host die geen extra processen toestaat),
+  # dan zoekt de app gewoon in het hoofdproces, zoals voorheen.
+  ASYNC <- tryCatch({
+    mirai::daemons(1)
+    mirai::everywhere({
+      setwd(app_map)
+      suppressMessages(shiny::loadSupport(app_map, renv = globalenv()))
+    }, app_map = normalizePath("."))
+    onStop(function() mirai::daemons(0))
+    TRUE
+  }, error = function(e) {
+    message("Achtergrondproces niet gestart, zoeken zonder: ", conditionMessage(e))
+    FALSE
+  })
+}
+
+# Live opgehaalde resultaten, gedeeld door alle bezoekers van dit proces
+resultaat_cache <- cachem::cache_mem(max_age = 3600)
+
 # --- UI ----------------------------------------------------------------------
 
 ui <- function(request) {
@@ -35,7 +60,7 @@ ui <- function(request) {
           selected = STANDAARD_TERMEN,
           multiple = TRUE,
           options = list(
-            create = TRUE, persist = TRUE,
+            create = TRUE, persist = TRUE, maxItems = MAX_TERMEN,
             placeholder = "Kies of typ een term…",
             plugins = list("remove_button")
           )
@@ -43,8 +68,8 @@ ui <- function(request) {
         helpText("Typ zelf een term of woordgroep (bijv. 'kunst en cultuur')",
                  "en druk op Enter om hem toe te voegen."),
         sliderInput("jaren", "Periode (vergaderdatum)",
-                    min = EERSTE_JAAR, max = HUIDIG_JAAR,
-                    value = c(2020, HUIDIG_JAAR), step = 1, sep = ""),
+                    min = EERSTE_JAAR, max = huidig_jaar(),
+                    value = standaard_periode(), step = 1, sep = ""),
         checkboxInput("opt_context", "Alleen in cultuurcontext",
                       value = STANDAARD_OPTIES$context),
         checkboxInput("opt_dedup", "Dubbele bijlagen samenvoegen",
@@ -55,8 +80,9 @@ ui <- function(request) {
           "Cultuurcontext: een term telt alleen als binnen %d woorden een",
           "cultuurwoord staat (cultuur, kunst, muziek, theater, …). Geldt",
           "niet voor termen die zelf al over cultuur gaan."), CONTEXT_AFSTAND)),
-        actionButton("ophalen", "Haal Live Data Op",
-                     class = "btn-primary", width = "100%"),
+        bslib::input_task_button("ophalen", "Zoeken",
+                                 label_busy = "Bezig met zoeken…",
+                                 class = "btn-primary", width = "100%"),
         hr(),
         radioButtons("maatstaf", "Maatstaf", choices = MAATSTAVEN,
                      selected = "relatief"),
@@ -169,40 +195,16 @@ server <- function(input, output, session) {
     dedup = isTRUE(input$opt_dedup)
   ))
 
-  # Ook gebruikt bij het openen van een gedeelde link (zie onRestored)
-  doe_ophalen <- function(termen, jaren, opties,
-                          trend_selectie = NULL, profiel_selectie = NULL) {
-    termen <- schoon_termen(termen)
-    if (length(termen) == 0) {
-      showNotification("Kies minstens één zoekterm.", type = "warning")
-      return(invisible(FALSE))
-    }
+  meld_fout <- function(tekst) {
+    foutmelding(tekst)
+    showNotification(tekst, type = "error", duration = 10)
+  }
 
-    id <- showNotification("Live data ophalen…", duration = NULL,
-                           closeButton = FALSE)
-    on.exit(removeNotification(id), add = TRUE)
-
-    res <- withCallingHandlers(
-      tryCatch(
-        haal_resultaat(termen, jaren, opties),
-        httr2_failure = function(e) {
-          foutmelding(paste("Geen verbinding met de API:", conditionMessage(e)))
-          NULL
-        },
-        error = function(e) {
-          foutmelding(paste("Fout bij ophalen/verwerken:", conditionMessage(e)))
-          NULL
-        }
-      ),
-      warning = function(w) {
-        showNotification(conditionMessage(w), type = "warning", duration = 10)
-        invokeRestart("muffleWarning")
-      }
-    )
-
-    if (is.null(res)) {
-      showNotification(foutmelding(), type = "error", duration = 10)
-      return(invisible(FALSE))
+  # Een (nieuw) resultaat tonen en de keuzelijsten bijwerken
+  verwerk_resultaat <- function(res, trend_selectie = NULL,
+                                profiel_selectie = NULL) {
+    for (m in res$meldingen) {
+      showNotification(m, type = "warning", duration = 10)
     }
     foutmelding(NULL)
     resultaat(res)
@@ -225,6 +227,100 @@ server <- function(input, output, session) {
       showNotification("Geen resultaten gevonden voor deze termen.",
                        type = "warning")
     }
+  }
+
+  # Selecties uit een gedeelde link, toe te passen zodra het live resultaat er is
+  wachtende_selectie <- reactiveVal(list())
+
+  # Live zoeken in een apart proces, zodat de app voor anderen (en voor deze
+  # bezoeker) bruikbaar blijft terwijl de API antwoordt.
+  zoek_taak <- ExtendedTask$new(function(termen, jaren, opties) {
+    mirai::mirai({
+      meldingen <- character()
+      res <- withCallingHandlers(
+        haal_data_op(termen, jaren, opties),
+        warning = function(w) {
+          meldingen <<- c(meldingen, conditionMessage(w))
+          invokeRestart("muffleWarning")
+        })
+      res$bron <- "live"
+      res$meldingen <- meldingen
+      res
+    }, termen = termen, jaren = jaren, opties = opties)
+  })
+  if (ASYNC) bslib::bind_task_button(zoek_taak, "ophalen")
+
+  observeEvent(zoek_taak$status(), {
+    status <- zoek_taak$status()
+    if (status == "success") {
+      res <- zoek_taak$result()
+      resultaat_cache$set(zoek_sleutel(res$termen, res$jaren, res$opties), res)
+      sel <- wachtende_selectie()
+      verwerk_resultaat(res, sel$trend, sel$profiel)
+      wachtende_selectie(list())
+    } else if (status == "error") {
+      tekst <- tryCatch({ zoek_taak$result(); "" },
+                        error = function(e) conditionMessage(e))
+      # De blokkade van het achtergrondproces ook hier onthouden
+      if (grepl("429", tekst)) zet_blokkade()
+      meld_fout(if (grepl("429", tekst)) tekst
+                else paste("Fout bij ophalen/verwerken:", tekst))
+    }
+  })
+
+  # Ook gebruikt bij het openen van een gedeelde link (zie onRestored)
+  doe_ophalen <- function(termen, jaren, opties,
+                          trend_selectie = NULL, profiel_selectie = NULL) {
+    termen <- schoon_termen(termen)
+    if (length(termen) == 0) {
+      showNotification("Kies minstens één zoekterm.", type = "warning")
+      return(invisible(FALSE))
+    }
+    jaren <- as.integer(jaren)
+
+    # 1. Voorberekend of al eerder in dit proces opgehaald: direct tonen
+    sleutel <- zoek_sleutel(termen, jaren, opties)
+    res <- zoek_voorberekend(termen, jaren, opties)
+    if (is.null(res)) {
+      bewaard <- resultaat_cache$get(sleutel)
+      if (!cachem::is.key_missing(bewaard)) res <- bewaard
+    }
+    if (!is.null(res)) {
+      verwerk_resultaat(res, trend_selectie, profiel_selectie)
+      return(invisible(TRUE))
+    }
+
+    # 2. Tijdens een blokkade van de API niet opnieuw proberen
+    if (!is.null(blokkade_tot())) {
+      meld_fout(tryCatch(blokkade_fout(), error = conditionMessage))
+      return(invisible(FALSE))
+    }
+
+    # 3. Live ophalen (op de achtergrond)
+    if (ASYNC) {
+      wachtende_selectie(list(trend = trend_selectie, profiel = profiel_selectie))
+      zoek_taak$invoke(termen, jaren, opties)
+      return(invisible(TRUE))
+    }
+    id <- showNotification("Live data ophalen…", duration = NULL,
+                           closeButton = FALSE)
+    on.exit(removeNotification(id), add = TRUE)
+    meldingen <- character()
+    res <- withCallingHandlers(
+      tryCatch(haal_data_op(termen, jaren, opties), error = function(e) e),
+      warning = function(w) {
+        meldingen <<- c(meldingen, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      })
+    if (inherits(res, "error")) {
+      meld_fout(if (inherits(res, "api_blokkade")) conditionMessage(res)
+                else paste("Fout bij ophalen/verwerken:", conditionMessage(res)))
+      return(invisible(FALSE))
+    }
+    res$bron <- "live"
+    res$meldingen <- meldingen
+    resultaat_cache$set(sleutel, res)
+    verwerk_resultaat(res, trend_selectie, profiel_selectie)
     invisible(TRUE)
   }
 
@@ -287,6 +383,13 @@ server <- function(input, output, session) {
         } else {
           "Live opgehaald"
         }),
+      if (identical(res$bron, "voorberekend") &&
+          leeftijd_dagen(res) > WAARSCHUW_LEEFTIJD_DAGEN) {
+        tags$div(class = "text-warning",
+                 sprintf("Let op: deze gegevens zijn %d dagen oud; de nachtelijke",
+                         floor(leeftijd_dagen(res))),
+                 "bijwerking is waarschijnlijk mislukt.")
+      },
       if (!res$inwoners_ok) {
         tags$div(class = "text-warning", "CBS-inwonersdata niet beschikbaar.")
       }
@@ -309,7 +412,7 @@ server <- function(input, output, session) {
   output$kaart <- renderLeaflet(basiskaart())
 
   # Gemeentegrenzen: eerste keer ~2 s bij PDOK, daarna uit de schijfcache
-  grenzen <- tryCatch(haal_gemeentegrenzen(), error = function(e) {
+  grenzen <- tryCatch(per_proces("grenzen", haal_gemeentegrenzen), error = function(e) {
     showNotification(paste("Gemeentegrenzen niet beschikbaar:",
                            conditionMessage(e)), type = "error", duration = 10)
     NULL
@@ -421,24 +524,19 @@ server <- function(input, output, session) {
 
   # --- Budget (CBS Iv3), per keuze één keer ophalen ---
 
-  lasten_cache <- reactiveValues()
+  # Eén keer per proces (gedeeld door alle bezoekers); normaal uit de
+  # nachtelijke voorberekening, anders live bij het CBS. Mislukt het, dan
+  # wordt het een minuut niet opnieuw geprobeerd.
   lasten_voor <- function(keuze) {
-    if (is.null(lasten_cache[[keuze]])) {
-      id <- showNotification(sprintf("Cultuurbudgetten ophalen bij CBS (%s)…",
-                                     names(IV3_KEUZES)[IV3_KEUZES == keuze]),
-                             duration = NULL, closeButton = FALSE)
-      on.exit(removeNotification(id), add = TRUE)
-      lasten_cache[[keuze]] <- tryCatch(
-        haal_cultuurlasten(keuze),
-        error = function(e) {
-          showNotification(paste("CBS-budgetdata ophalen mislukt:",
-                                 conditionMessage(e)),
-                           type = "error", duration = 10)
-          NULL
-        }
-      )
-    }
-    lasten_cache[[keuze]]
+    tryCatch(
+      per_proces(paste0("iv3_", keuze), \() haal_cultuurlasten(keuze)),
+      error = function(e) {
+        showNotification(paste("CBS-budgetdata ophalen mislukt:",
+                               conditionMessage(e)),
+                         type = "error", duration = 10)
+        NULL
+      }
+    )
   }
 
   # --- Gemeenteprofiel ---
@@ -461,8 +559,8 @@ server <- function(input, output, session) {
       sprintf("rang %d van %d", sum(alle[[kolom]] > rij[[kolom]]) + 1,
               nrow(alle))
     }
-    # Reactief: verschijnt zodra de budgetgrafiek de CBS-data heeft opgehaald
-    budget <- lasten_cache[[IV3_KEUZES[[1]]]]
+    # Uit het procesgeheugen of de nachtelijke voorberekening; meestal direct
+    budget <- lasten_voor(IV3_KEUZES[[1]])
     euro <- if (!is.null(budget)) {
       budget$cultuur_per_inw[budget$gemeentecode %in% rij$gemeentecode][1]
     }
@@ -477,7 +575,7 @@ server <- function(input, output, session) {
              paste("per 100.000 inwoners per jaar ·", rang("per_100k"))),
         blok(fmt(rij$totaal, 0), "documenten met een treffer"),
         blok(fmt(rij$inwoners, 0), "inwoners (CBS)"),
-        if (!is.null(euro)) {
+        if (!is.null(euro) && !is.na(euro)) {
           blok(paste0("€", fmt(euro, 0)),
                paste("cultuur per inwoner,", names(IV3_KEUZES)[1]))
         })
@@ -544,7 +642,6 @@ server <- function(input, output, session) {
   budget_df <- reactive({
     res <- resultaat()
     shiny::validate(need(res, "Haal eerst live data op."))
-    req(input$tabs == "budget" || !is.null(lasten_cache[[input$budget_keuze]]))
     lasten <- lasten_voor(input$budget_keuze)
     shiny::validate(need(lasten, "Budgetdata niet beschikbaar."))
     df <- maak_budget_df(res$per_gemeente, lasten, aandacht_kolom())
