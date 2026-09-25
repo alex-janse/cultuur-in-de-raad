@@ -51,11 +51,11 @@ voeg_kaartlagen_toe <- function(kaart, kaart_df, maatstaf) {
   breaks <- unique(quantile(kaart_df$waarde, probs = seq(0, 1, 0.2),
                             na.rm = TRUE))
   pal <- if (length(breaks) >= 2) {
-    colorBin("RdPu", domain = kaart_df$waarde, bins = breaks,
+    colorBin(PALET_KAART, domain = kaart_df$waarde, bins = breaks,
              na.color = GEEN_DATA_KLEUR)
   } else {
     # Eén unieke waarde (of geen): een schaal van 0 tot die waarde
-    colorNumeric("RdPu", domain = c(0, max(1, breaks)), na.color = GEEN_DATA_KLEUR)
+    colorNumeric(PALET_KAART, domain = c(0, max(1, breaks)), na.color = GEEN_DATA_KLEUR)
   }
   cijfers <- if (maatstaf == "absoluut") 0 else 1
   # Legenda in Nederlandse notatie (labelFormat kent geen decimale komma)

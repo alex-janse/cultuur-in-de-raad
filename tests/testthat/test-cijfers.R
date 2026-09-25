@@ -55,7 +55,7 @@ test_that("bereken_maatstaven deelt door de jaren met dekking", {
 test_that("rangschik: echte nullen doen mee, weinig treffers krijgen geen rang", {
   pg <- tibble(key = c("a", "b", "c", "d"), gemeente = c("A", "B", "C", "D"),
                totaal = c(50, 5, 0, 30), per_1000 = c(2, 9, 0, 3),
-               per_1000_laag = 1, per_1000_hoog = 4,
+               per_1000_laag = 1, per_1000_hoog = 4, inwoners = 30000,
                weinig_treffers = c(FALSE, TRUE, TRUE, FALSE))
   r <- rangschik(pg, "relatief")
   expect_equal(r$key, c("d", "a", "b", "c"))   # B (9) is hoog maar toevallig

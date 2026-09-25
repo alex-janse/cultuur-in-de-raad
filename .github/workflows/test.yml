@@ -26,7 +26,7 @@ jobs:
 
       - name: R-pakketten installeren
         run: |
-          Rscript -e 'install.packages(c("shiny", "bslib", "httr2", "jsonlite", "dplyr", "tidyr", "leaflet", "ggplot2", "ggrepel", "cbsodataR", "sf", "cachem", "rlang", "mirai", "testthat", "withr"))'
+          Rscript -e 'install.packages(c("shiny", "bslib", "httr2", "jsonlite", "dplyr", "tidyr", "leaflet", "ggplot2", "ggrepel", "cbsodataR", "sf", "cachem", "rlang", "mirai", "DT", "testthat", "withr"))'
 
       - name: Tests
         run: Rscript -e 'testthat::test_dir("tests/testthat", stop_on_failure = TRUE)'
