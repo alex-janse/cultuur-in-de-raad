@@ -52,3 +52,14 @@ test_that("plot_budget_trend toont gemeente naast de mediaan", {
   expect_equal(p$data$euro[p$data$reeks == "Mediaan alle gemeenten"], c(100, 110))
   expect_no_error(ggplot_build(p))
 })
+
+test_that("het lopende jaar krijgt een open punt en een toelichting", {
+  df <- tibble(gebied = "Nederland", jaar = (huidig_jaar() - 2):huidig_jaar(),
+               term = "a", n = c(5, 6, 2), archief = 1000)
+  p <- plot_trend(df, "a", c(huidig_jaar() - 2, huidig_jaar()))
+  expect_equal(p$data$lopend, c(FALSE, FALSE, TRUE))
+  expect_match(p$labels$caption, "nog niet compleet")
+  expect_no_error(ggplot_build(p))
+  vroeger <- plot_trend(df |> mutate(jaar = jaar - 5), "a", c(2015, 2020))
+  expect_null(vroeger$labels$caption)
+})
