@@ -70,6 +70,10 @@ TERMEN <- list(
 )
 STANDAARD_TERMEN <- c("amateurkunst", "cultuurbeoefening", "talentontwikkeling")
 
+# Toont bovenaan een balk dat dit een testversie is (uitzetten als de
+# validatie klaar is en het dashboard breed gedeeld wordt)
+TESTVERSIE <- TRUE
+
 # Kiezen in de dropdown 'Thema' vervangt de zoektermen door deze set
 THEMASETS <- list(
   "Cultuurparticipatie" = c("amateurkunst", "cultuurbeoefening",
