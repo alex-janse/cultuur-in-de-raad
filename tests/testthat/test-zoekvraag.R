@@ -1,8 +1,11 @@
 test_that("cultuurcontext geldt alleen voor termen die zelf niet over cultuur gaan", {
   opt <- list(context = TRUE, woordvormen = FALSE, dedup = TRUE)
   q <- term_query("talentontwikkeling", opt)
-  expect_named(q, "intervals")
-  expect_equal(q$intervals$text$all_of$max_gaps, CONTEXT_AFSTAND)
+  expect_named(q, "bool")
+  # dezelfde contexteis in titel, beschrijving en tekst
+  velden <- vapply(q$bool$should, \(x) names(x$intervals), character(1))
+  expect_equal(velden, VELDEN)
+  expect_equal(q$bool$should[[3]]$intervals$text$all_of$max_gaps, CONTEXT_AFSTAND)
   expect_named(term_query("amateurkunst", opt), "multi_match")
   expect_named(term_query("talentontwikkeling", list(context = FALSE)), "multi_match")
 })
@@ -13,7 +16,7 @@ test_that("woordvormen alleen voor enkele woorden, met escaping", {
   expect_equal(term_query("sint-jan", opt)$query_string$query, "sint\\-jan*")
   expect_named(term_query("kunst en cultuur", opt), "multi_match")
   ctx <- term_query("talentontwikkeling", list(context = TRUE, woordvormen = TRUE))
-  expect_named(ctx$intervals$text$all_of$intervals[[1]], "prefix")
+  expect_named(ctx$bool$should[[1]]$intervals$name$all_of$intervals[[1]], "prefix")
 })
 
 test_that("tel gebruikt unieke bijlagen plus documenten zonder bestand", {
