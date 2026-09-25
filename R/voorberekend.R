@@ -29,6 +29,34 @@ zoek_sleutel <- function(termen, jaren, opties) {
   ))
 }
 
+# Een .rds van internet mag alleen gewone gegevens bevatten: tabellen,
+# lijsten, tekst, getallen en kaartvormen. Functies, environments en
+# dergelijke kunnen code uitvoeren en worden geweigerd. (Het bestand komt van
+# onze eigen GitHub Action; dit is een extra slot op de deur. R >= 4.4 dicht
+# bovendien het bekende lek bij het inlezen van .rds-bestanden, CVE-2024-27322.)
+VEILIGE_TYPES <- c("NULL", "logical", "integer", "double", "complex",
+                   "character", "list")
+
+veilig_object <- function(x, diepte = 0) {
+  if (diepte > 50 || !typeof(x) %in% VEILIGE_TYPES || isS4(x)) return(FALSE)
+  for (a in attributes(x)) {
+    if (!veilig_object(a, diepte + 1)) return(FALSE)
+  }
+  if (is.list(x)) {
+    for (el in x) {
+      if (!veilig_object(el, diepte + 1)) return(FALSE)
+    }
+  }
+  TRUE
+}
+
+lees_rds_veilig <- function(pad) {
+  x <- readRDS(pad)
+  if (veilig_object(x)) return(x)
+  warning("Voorberekend bestand geweigerd: bevat meer dan gewone gegevens.")
+  NULL
+}
+
 # Onthoudt per bestand de uitkomst, óók 'niet gevonden': een echte 404 een
 # uur, andere fouten (time-out, storing bij GitHub) maar een minuut, zodat
 # de app niet een uur lang onnodig live gaat.
@@ -45,7 +73,7 @@ lees_voorberekend <- function(bestand) {
     map <- sub("^file://", "", basis)                        # /tmp/x of /C:/x
     if (grepl("^/+[A-Za-z]:", map)) map <- sub("^/+", "", map)  # Windows: C:/x
     pad <- file.path(map, bestand)
-    return(if (file.exists(pad)) tryCatch(readRDS(pad), error = \(e) NULL))
+    return(if (file.exists(pad)) tryCatch(lees_rds_veilig(pad), error = \(e) NULL))
   }
 
   tmp <- tempfile(fileext = ".rds")
@@ -56,7 +84,7 @@ lees_voorberekend <- function(bestand) {
       req_error(is_error = \(r) FALSE) |>
       req_perform(path = tmp)
     if (resp_status(resp) == 200) {
-      list(data = readRDS(tmp), geldig = 3600)
+      list(data = lees_rds_veilig(tmp), geldig = 3600)
     } else if (resp_status(resp) == 404) {
       list(data = NULL, geldig = 3600)
     } else {

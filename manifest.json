@@ -2655,13 +2655,13 @@
   },
   "files": {
     "app.R": {
-      "checksum": "f34a7b3d853a020e4fb1b4b663765498"
+      "checksum": "b65b6e95fa0fc7e239ff8c787b6fe885"
     },
     "R/00_pakketten.R": {
       "checksum": "8cbd0326cdeca71d715fdbac31aa17ab"
     },
     "R/api_ori.R": {
-      "checksum": "1bb36e6366572fd1af80ee249f32d060"
+      "checksum": "e355294dbef760b500d80e57554bfbf3"
     },
     "R/cache.R": {
       "checksum": "fcd37db882e6337b953ea97caee28856"
@@ -2670,10 +2670,10 @@
       "checksum": "2045d7716a2e7eccf13842aeaf9ef38d"
     },
     "R/config.R": {
-      "checksum": "f3599023ce6d811ab49fe5158cfabff5"
+      "checksum": "7c3e0f9ffdf44f9f08f49f725d29ce1b"
     },
     "R/export.R": {
-      "checksum": "46e317146c6471547dd858bde407af5c"
+      "checksum": "2f4d14fa8953d8afd0372618e00fc01c"
     },
     "R/geo.R": {
       "checksum": "445c2a45ea1c9249bb1253f098a5f312"
@@ -2691,7 +2691,7 @@
       "checksum": "fa91cbbb0b9e918ee60c120e35146236"
     },
     "R/voorberekend.R": {
-      "checksum": "e8e590e5e7a4d923be7121b8b7f953e0"
+      "checksum": "f76c3e517e06382c7b06697d2b504d74"
     }
   },
   "users": null
