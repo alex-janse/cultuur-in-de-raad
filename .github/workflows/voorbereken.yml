@@ -55,3 +55,11 @@ jobs:
           git commit -q -m "Voorberekende data $(date -u +%F)"
           # Alleen de laatste versie bewaren, zodat de repository klein blijft
           git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" data
+
+      - name: Controle op onderdelen die niet zijn bijgewerkt
+        run: |
+          if [ -f mislukt.txt ]; then
+            echo "::error::Niet alles is bijgewerkt (de vorige versie blijft staan):"
+            cat mislukt.txt
+            exit 1
+          fi

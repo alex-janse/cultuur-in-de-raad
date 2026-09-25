@@ -67,43 +67,89 @@ message("Gemeentegrenzen")
 g <- probeer("grenzen", haal_gemeentegrenzen)
 if (is.null(g)) mislukt <- c(mislukt, "grenzen") else bewaar(g, "gemeentegrenzen.rds")
 
+
 # --- Standaardzoekvragen ----------------------------------------------------
+
+# Vorig overzicht (van de data-tak) om nieuwe uitkomsten mee te vergelijken
+vorig_pad <- file.path(uitvoer, "overzicht.csv")
+vorige <- if (file.exists(vorig_pad)) utils::read.csv(vorig_pad) else data.frame()
+
+# Een nieuwe uitkomst die sterk afwijkt van de vorige nacht (met dezelfde
+# methode en periode) is verdacht: bv. ontbrekende archieven bij de API.
+# Dan liever de vorige versie laten staan dan onzin publiceren.
+MAX_AFWIJKING <- 0.2
+verdacht <- function(naam, rij) {
+  v <- vorige[vorige$set == naam, , drop = FALSE]
+  if (nrow(v) != 1 || !all(c("methode", "gemeenten") %in% names(v))) return(NULL)
+  if (v$methode != rij$methode || v$periode != rij$periode) return(NULL)
+  if (rij$gemeenten < (1 - MAX_AFWIJKING) * v$gemeenten) {
+    return(sprintf("%d archieven, vorige keer %d", rij$gemeenten, v$gemeenten))
+  }
+  if (abs(rij$documenten - v$documenten) > MAX_AFWIJKING * v$documenten) {
+    return(sprintf("%d documenten, vorige keer %d", rij$documenten, v$documenten))
+  }
+  NULL
+}
 
 overzicht <- list()
 for (naam in names(voorberekende_sets())) {
   termen <- voorberekende_sets()[[naam]]
   message("Zoekvraag ", naam, ": ", paste(termen, collapse = ", "))
-  res <- probeer(naam, \() haal_data_op(termen, VOORBEREKEND_JAREN, STANDAARD_OPTIES))
+  res <- probeer(naam, \() haal_data_op(termen, standaard_periode(), STANDAARD_OPTIES))
   Sys.sleep(PAUZE)
   trends <- if (!is.null(res)) {
     probeer(paste(naam, "trends"),
-            \() haal_trends_alle(termen, VOORBEREKEND_JAREN, STANDAARD_OPTIES))
+            \() haal_trends_alle(termen, standaard_periode(), STANDAARD_OPTIES))
   }
   Sys.sleep(PAUZE)
-  if (is.null(res) || is.null(trends)) {
-    mislukt <- c(mislukt, naam)
+
+  rij <- if (!is.null(res) && !is.null(trends)) {
+    data.frame(
+      set = naam, termen = paste(termen, collapse = ", "),
+      periode = paste(standaard_periode(), collapse = "-"),
+      documenten = res$totaal_docs, gemeenten = nrow(res$per_gemeente),
+      methode = methode_versie(),
+      sleutel = zoek_sleutel(termen, standaard_periode(), STANDAARD_OPTIES),
+      berekend_op = format(res$berekend_op, "%Y-%m-%d %H:%M %Z")
+    )
+  }
+  reden <- if (is.null(rij)) "ophalen mislukt" else verdacht(naam, rij)
+  if (!is.null(reden)) {
+    message(sprintf("  %s niet bijgewerkt: %s", naam, reden))
+    mislukt <- c(mislukt, sprintf("%s (%s)", naam, reden))
+    # De vorige versie blijft staan en in het overzicht
+    v <- vorige[vorige$set == naam, , drop = FALSE]
+    if (nrow(v) == 1) overzicht[[naam]] <- v
     next
   }
   res$trends <- trends
-  res$berekend_op <- Sys.time()
-  sleutel <- zoek_sleutel(termen, VOORBEREKEND_JAREN, STANDAARD_OPTIES)
-  bewaar(res, sprintf("zoek_%s.rds", sleutel))
-  overzicht[[naam]] <- data.frame(
-    set = naam, termen = paste(termen, collapse = ", "),
-    periode = paste(VOORBEREKEND_JAREN, collapse = "-"),
-    documenten = res$totaal_docs, sleutel = sleutel,
-    berekend_op = format(res$berekend_op, "%Y-%m-%d %H:%M %Z")
-  )
+  bewaar(res, sprintf("zoek_%s.rds", rij$sleutel))
+  overzicht[[naam]] <- rij
 }
+
 if (length(overzicht) > 0) {
-  utils::write.csv(do.call(rbind, overzicht), file.path(uitvoer, "overzicht.csv"),
-                   row.names = FALSE)
+  nieuw <- dplyr::bind_rows(overzicht)
+  utils::write.csv(nieuw, vorig_pad, row.names = FALSE)
+  # Opruimen: zoekresultaten die niet (meer) in het overzicht staan, bv. na
+  # een andere methode of periode
+  houden <- sprintf("zoek_%s.rds", nieuw$sleutel)
+  oud <- setdiff(list.files(uitvoer, pattern = "^zoek_.*[.]rds$"), houden)
+  if (length(oud) > 0) {
+    file.remove(file.path(uitvoer, oud))
+    message("Opgeruimd: ", paste(oud, collapse = ", "))
+  }
 }
 
 # --- Afsluiting ---------------------------------------------------------------
 
+# mislukt.txt laat de workflow na het publiceren rood worden, zodat een
+# gedeeltelijke mislukking opvalt (de geslaagde delen zijn dan wél bijgewerkt)
+mislukt_pad <- file.path(uitvoer, "..", "mislukt.txt")
 if (length(mislukt) > 0) {
-  message("Mislukt (vorige versie blijft staan): ", paste(mislukt, collapse = ", "))
+  message("Mislukt of niet bijgewerkt: ", paste(mislukt, collapse = "; "))
+  writeLines(mislukt, mislukt_pad)
+} else if (file.exists(mislukt_pad)) {
+  file.remove(mislukt_pad)
 }
 aantal_onderdelen <- 1 + length(IV3_KEUZES) + 1 + length(voorberekende_sets())
 if (length(mislukt) == aantal_onderdelen) {
