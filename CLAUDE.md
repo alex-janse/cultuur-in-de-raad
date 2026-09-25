@@ -28,3 +28,8 @@ R Shiny-dashboard over kunst- en cultuurthema's in Nederlandse gemeenteraden
       Open Raadsinformatie) in een openbare app wordt gebruikt, vragen of dat mag,
       wat de limieten van de API zijn en hoe ze naamsvermelding willen.
       Nog niet versturen: de gebruiker geeft aan wanneer.
+- [ ] Validatie-steekproef (ROADMAP 1.7): volledige steekproef trekken met
+      `Rscript scripts/validatie.R steekproef 50` (~12 verzoeken; niet vlak na andere
+      zware tests i.v.m. HTTP 429), laten beoordelen door iemand met kennis van het veld,
+      daarna `scripts/validatie.R bereken <csv>` en de precisie per term in README en
+      uitleg zetten. Wacht op de gebruiker.
