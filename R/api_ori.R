@@ -374,10 +374,12 @@ haal_fragmenten <- function(ruwe_namen, termen, jaren, opties = STANDAARD_OPTIES
     sort = list(list(last_discussed_at = "desc")),
     query = list(bool = list(filter = list(periode_query(jaren),
                                            of_query(termen, opties)))),
+    # Gewone tekst met onze eigen markeringstekens; de app escapet alles zelf
+    # en maakt daarna pas <mark> van de markeringen (zie markeer_html()). Zo
+    # hangt de veiligheid niet af van hoe de bron-API escapet.
     highlight = list(
       highlight_query = markeer,
-      encoder = "html",  # tekst escapen, alleen onze <mark>-tags blijven
-      pre_tags = list("<mark>"), post_tags = list("</mark>"),
+      pre_tags = list(MARK_BEGIN), post_tags = list(MARK_EIND),
       fields = list(text = list(fragment_size = 220, number_of_fragments = 2),
                     name = list(number_of_fragments = 0))
     )
@@ -388,11 +390,13 @@ haal_fragmenten <- function(ruwe_namen, termen, jaren, opties = STANDAARD_OPTIES
   bind_rows(lapply(json$hits$hits, function(h) {
     s <- h[["_source"]]
     frag <- unlist(h$highlight$text %||% list())
+    titel <- as.character(s$name %||% "(zonder titel)")
     tibble(
-      titel = as.character(s$name %||% "(zonder titel)"),
+      titel = titel,
       datum = substr(as.character(s$last_discussed_at %||% ""), 1, 10),
       link = as.character(s$original_url %||% s$url %||% ""),
-      # HTML-veilig: door ES ge-escaped, met alleen <mark> van ons
+      # Stukken waarin vaak namen van burgers staan: geen fragment tonen
+      privacy = grepl(PRIVACY_TITELS, tolower(titel)),
       fragmenten = paste(gsub("\\s+", " ", frag), collapse = " … ")
     )
   }))
