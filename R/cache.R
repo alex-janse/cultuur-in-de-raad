@@ -10,7 +10,8 @@ schijf_cache <- function(naam, max_dagen, maak) {
     leeftijd <- difftime(Sys.time(), file.mtime(pad), units = "days")
     if (leeftijd < max_dagen) return(readRDS(pad))
   }
-  data <- maak()
+  # Dan de nachtelijk voorberekende versie, en pas daarna live ophalen
+  data <- lees_voorberekend(paste0(naam, ".rds")) %||% maak()
   # Op een server met een alleen-lezen map werkt de app gewoon zonder cache
   tryCatch({
     dir.create(cache_map(), showWarnings = FALSE, recursive = TRUE)

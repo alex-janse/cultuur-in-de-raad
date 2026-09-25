@@ -260,6 +260,26 @@ haal_trend_gemeente <- function(ruwe_namen, termen, jaren,
   parse_jaren(buckets, termen, opties$dedup)
 }
 
+# Trends van álle gemeenten in één verzoek (gemeente > jaar > term). Zwaar
+# (~10 s, ~15 MB JSON), daarom alleen voor de nachtelijke voorberekening.
+haal_trends_alle <- function(termen, jaren, opties = STANDAARD_OPTIES) {
+  body <- list(size = 0, query = periode_query(jaren),
+               aggs = list(gemeenten = list(
+                 terms = list(field = "_index", size = 1000),
+                 aggs = list(jaren = jaren_agg(termen, opties)))))
+  json <- post_json(body)
+  buckets <- json$aggregations$gemeenten$buckets
+  if (is.null(buckets)) stop("Onverwachte JSON-structuur voor trends.")
+
+  bind_rows(lapply(buckets, function(b) {
+    parse_jaren(b$jaren$buckets, termen, opties$dedup) |>
+      mutate(key = ruw_naar_key(index_naar_ruw(b$key)))
+  })) |>
+    # stadsdelen en fusiegemeenten optellen bij de huidige gemeente
+    group_by(key, jaar, term) |>
+    summarise(n = sum(n), archief = sum(archief), .groups = "drop")
+}
+
 # Nieuwste treffers van één gemeente met de zinnen waarin een term voorkomt.
 # De markering gebruikt een eenvoudige zoekvraag op de termen zelf: de
 # 'intervals'-query van de cultuurcontext markeert anders ook de cultuurwoorden.

@@ -53,9 +53,32 @@ Start daarna de app vanuit deze map:
 shiny::runApp()
 ```
 
-Klik op **Haal Live Data Op**. De eerste keer duurt dat ongeveer 15 seconden.
-Gegevens van het CBS en PDOK worden daarna in `cache/` bewaard, en een
-herhaalde zoekvraag komt uit het geheugen.
+Klik op **Haal Live Data Op**.
+
+### Snel laden dankzij een nachtelijke berekening
+
+Elke nacht rekent een GitHub Action
+([`voorbereken.yml`](.github/workflows/voorbereken.yml)) de volgende zoekvragen
+vooraf uit:
+
+- de standaardtermen;
+- elke themaset, met de standaardperiode en de standaardinstellingen;
+- de CBS-cijfers en de gemeentegrenzen.
+
+De uitkomsten komen op de tak [`data`](../../tree/data) van deze repository.
+De app leest die eerst. Zo'n zoekvraag laadt daardoor direct, en de API van
+OpenBesluitvorming wordt minder belast.
+
+Alleen andere termen, perioden of instellingen gaan live naar de API. Dat
+duurt ongeveer 15 seconden. Daarna blijft het resultaat een uur in het
+geheugen.
+
+De berekening kun je ook zelf starten, via het tabblad *Actions* op GitHub of
+lokaal:
+
+```r
+source("scripts/voorbereken.R")   # of: Rscript scripts/voorbereken.R uitvoer
+```
 
 Tests draaien:
 
@@ -119,6 +142,8 @@ R/geo.R            gemeentegrenzen (PDOK)
 R/kaart.R          kaartopbouw
 R/plots.R          grafieken
 R/cache.R          schijf- en geheugencache
+R/voorberekend.R   nachtelijk voorberekende data lezen
+scripts/           nachtelijke voorberekening (GitHub Action)
 R/export.R         CSV-export
 R/namen.R          naamnormalisatie en opmaak
 tests/testthat/    tests

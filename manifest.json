@@ -2587,16 +2587,16 @@
   },
   "files": {
     "app.R": {
-      "checksum": "7aa1e87e3f56ec157a42f2541ae8b247"
+      "checksum": "fa86022f4b84a1aed0df277f19b5827f"
     },
     "R/00_pakketten.R": {
       "checksum": "8cbd0326cdeca71d715fdbac31aa17ab"
     },
     "R/api_ori.R": {
-      "checksum": "f1886d9f50aa47ca29ee9f02134483cc"
+      "checksum": "4a5ac21e2b5d29558f2f9754e52826f5"
     },
     "R/cache.R": {
-      "checksum": "196cc448615551c12580f40d4a5dbec7"
+      "checksum": "18de768a13015cc5d7a49aef45c7971e"
     },
     "R/cbs.R": {
       "checksum": "517adf0d70af333fde9618de4151a95f"
@@ -2618,6 +2618,9 @@
     },
     "R/plots.R": {
       "checksum": "bca1649aa522a10c353653d9423c5c6d"
+    },
+    "R/voorberekend.R": {
+      "checksum": "a7d22888f21db554352781117bb82039"
     }
   },
   "users": null

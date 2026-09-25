@@ -184,7 +184,7 @@ server <- function(input, output, session) {
 
     res <- withCallingHandlers(
       tryCatch(
-        haal_data_op(termen, jaren, opties),
+        haal_resultaat(termen, jaren, opties),
         httr2_failure = function(e) {
           foutmelding(paste("Geen verbinding met de API:", conditionMessage(e)))
           NULL
@@ -279,6 +279,14 @@ server <- function(input, output, session) {
         if (res$opties$dedup) "zonder dubbele bijlagen",
         if (res$opties$woordvormen) "met woordvormen"
       ), collapse = " · ")),
+      tags$br(), tags$small(
+        if (identical(res$bron, "voorberekend")) {
+          sprintf("Voorberekend op %s",
+                  format(res$berekend_op, "%d-%m-%Y %H:%M",
+                         tz = "Europe/Amsterdam"))
+        } else {
+          "Live opgehaald"
+        }),
       if (!res$inwoners_ok) {
         tags$div(class = "text-warning", "CBS-inwonersdata niet beschikbaar.")
       }
@@ -373,6 +381,11 @@ server <- function(input, output, session) {
     }
     rij <- res$per_gemeente |> filter(key == !!key)
     if (nrow(rij) != 1) return(NULL)
+    # Voorberekende resultaten bevatten de trends van alle gemeenten al
+    if (!is.null(res$trends)) {
+      return(res$trends |> filter(key == !!key) |> select(-key) |>
+               mutate(gebied = rij$gemeente))
+    }
     tryCatch(
       haal_trend_gemeente(rij$ruw[[1]], res$termen, res$jaren, res$opties) |>
         mutate(gebied = rij$gemeente),
