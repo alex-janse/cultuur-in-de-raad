@@ -58,11 +58,11 @@ Doel: een ranking die je kunt verdedigen.
 Klaar als: cijfers vóór en na naast elkaar gezet en de verschillen verklaard; precisie
 per term bekend (na het invullen door een vakinhoudelijk persoon).
 
-## Fase 2: Veilig en zorgvuldig
+## Fase 2: Veilig en zorgvuldig — afgerond (PR #3)
 | # | Wat | Waar |
 |---|---|---|
 | 2.1 | **Fragmenten zelf escapen**: ES laat ongebruikelijke markeringstekens zetten, alles wordt ge-escaped, daarna `<mark>`. Niet meer vertrouwen op `encoder = "html"`. | `R/api_ori.R` `haal_fragmenten()`, `app.R` |
-| 2.2 | **Privacy**: privacytekst met contactadres voor verwijderverzoeken; geen fragmenten tonen bij inspraak- of bezwaarstukken (herkenning op titel). | `app.R`, README |
+| 2.2 | **Privacy**: privacytekst (verwijderen via de bron; geen contactadres, keuze gebruiker); geen fragmenten tonen bij inspraak- of bezwaarstukken (herkenning op titel). | `app.R`, README |
 | 2.3 | **Data-tak als JSON/Parquet** in plaats van RDS (geen uitvoerbare R-objecten van internet), of in elk geval de klassen controleren. Actions vastzetten op een commit-SHA. | `R/voorberekend.R`, workflows |
 | 2.4 | **CSV-injectie**: titels die met `= + - @` beginnen escapen, en `veilige_link` ook in de documentenexport. | `R/export.R`, `app.R` |
 

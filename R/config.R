@@ -28,6 +28,32 @@ WAARSCHUW_LEEFTIJD_DAGEN <- 2
 MAX_TERMEN <- 8               # meer termen = zwaardere zoekvraag voor de API
 MIN_TEKENS_WOORDVORMEN <- 4   # 'ku*' is duur en loopt tegen limieten aan
 
+# Markeringen rond de zoekterm in fragmenten (tekens die in raadsstukken
+# vrijwel niet voorkomen); worden na het escapen <mark>
+MARK_BEGIN <- "⟦"
+MARK_EIND <- "⟧"
+
+# Privacy: in deze soorten stukken staan vaak namen en gegevens van burgers
+# (insprekers, bezwaarmakers, briefschrijvers). Daarvan tonen we geen
+# fragmenten, alleen de titel met een link naar de bron.
+PRIVACY_TITELS <- paste0(
+  "bezwaar|inspraak|inspreker|zienswijze|klacht|woo-verzoek|wob-verzoek|",
+  "persoonsgegevens|burgerbrief|ingekomen (stuk|brief)|brief van|",
+  "reactie van bewoner|bewonersbrief|petitie"
+)
+
+PRIVACY_TEKST <- paste(
+  "Dit dashboard toont gegevens uit openbare raadsstukken, zoals gemeenten",
+  "die publiceren en OpenBesluitvorming.nl ze beschikbaar maakt. Het slaat",
+  "zelf geen raadsstukken of gegevens van bezoekers op; alleen een deelbare",
+  "link bevat je zoekinstellingen. Van stukken waarin vaak gegevens van",
+  "burgers staan (zoals bezwaren, inspraak en ingekomen brieven) tonen we",
+  "geen tekstfragmenten. Staat er iets over jou in een raadsstuk dat daar",
+  "niet hoort? Verwijderen kan alleen bij de bron: de gemeente die het stuk",
+  "publiceerde (en OpenBesluitvorming.nl). Is het daar weg, dan verdwijnt het",
+  "hier vanzelf, uiterlijk na de volgende nachtelijke bijwerking."
+)
+
 # Een jaar telt als 'gedekt' (archief aanwezig) vanaf zoveel documenten
 MIN_DOCS_DEKKING <- 50
 # Minder treffers dan dit: geen plek in de ranking (te toevallig)

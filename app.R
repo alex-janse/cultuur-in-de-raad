@@ -100,7 +100,11 @@ ui <- function(request) {
         hr(),
         helpText("Bronnen: OpenBesluitvorming.nl / Open Raadsinformatie,",
                  "CBS (inwoners, Iv3-gemeentefinanciën) en PDOK/Kadaster.",
-                 "Telling = aantal raadsdocumenten waarin een term voorkomt.")
+                 "Telling = aantal raadsdocumenten waarin een term voorkomt."),
+        tags$details(
+          tags$summary(tags$small("Privacy")),
+          helpText(PRIVACY_TEKST)
+        )
       ),
       mainPanel(
         width = 9,
@@ -632,8 +636,13 @@ server <- function(input, output, session) {
           div(class = "meta", f$datum, " · ",
               if (nzchar(link)) tags$a(href = link, target = "_blank", f$titel)
               else f$titel),
-          # Door ES ge-escaped; alleen onze <mark>-tags zijn HTML
-          if (nzchar(f$fragmenten)) tags$p(HTML(f$fragmenten)))
+          if (f$privacy) {
+            tags$p(class = "text-muted", tags$small(
+              "Geen fragment: in dit soort stuk staan vaak gegevens van burgers."))
+          } else if (nzchar(f$fragmenten)) {
+            # Zelf ge-escaped; alleen onze <mark>-tags zijn HTML
+            tags$p(HTML(markeer_html(f$fragmenten)))
+          })
     }))
   })
 
@@ -742,6 +751,7 @@ server <- function(input, output, session) {
     filename = \() sprintf("cultuur-documenten-%s.csv", Sys.Date()),
     content = \(file) schrijf_csv(
       resultaat()$docs |>
+        mutate(link = veilige_link(link)) |>
         select(Gemeente = gemeente, Datum = datum, Titel = titel, Link = link),
       file)
   )
