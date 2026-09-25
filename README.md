@@ -99,22 +99,43 @@ testthat::test_dir("tests/testthat")
   De term wordt gezocht als exacte woordgroep in de titel, de beschrijving en
   de volledige tekst.
 - **Dubbele bijlagen samenvoegen** (standaard aan): dezelfde bijlage hangt
-  vaak bij meerdere agendapunten. Bestanden met precies dezelfde grootte
-  tellen één keer. Dat scheelt ongeveer 20% van de treffers. De naam is geen
-  goede sleutel, want veel bestanden heten "Bijlage 1.pdf".
+  vaak bij meerdere agendapunten. Binnen een gemeente tellen bestanden met
+  precies dezelfde grootte één keer; dat geldt voor de treffers én voor de
+  noemer.
+  - Dat scheelt ongeveer 15% van de treffers en 10% van het archief.
+  - De naam is geen goede sleutel, want veel bestanden heten "Bijlage 1.pdf".
+  - Gemeten (september 2026): het effect hangt niet samen met de grootte van
+    het archief (correlatie −0,02). Grote gemeenten worden er dus niet door
+    bevoordeeld.
+  - Toevallig even grote, verschillende bestanden komen weinig voor: in
+    Utrecht (2024) hooguit ~2%.
+  - De landelijke trend is de som van de gemeenten, zodat identieke stukken
+    van verschillende gemeenten niet worden samengevoegd.
 - **Alleen in cultuurcontext** (standaard aan): een term die zelf niet over
-  cultuur gaat (zoals *talentontwikkeling*) telt alleen als binnen 15 woorden
-  een cultuurwoord staat (cultuur, kunst, muziek, theater, museum, erfgoed, …).
-  Zonder deze eis gaat twee derde van de treffers voor *talentontwikkeling*
-  over sport, onderwijs of jeugd.
-- **Woordvormen** (optioneel): *amateurkunst* vindt dan ook
-  *amateurkunstenaars*.
+  cultuur gaat (zoals *talentontwikkeling* of *bedrijfscultuur*) telt alleen
+  als binnen 15 woorden een cultuurwoord staat (cultuur, kunst, muziek,
+  theater, museum, erfgoed, …). Dat geldt in de titel, de beschrijving en de
+  tekst. Zonder deze eis gaat twee derde van de treffers voor
+  *talentontwikkeling* over sport, onderwijs of jeugd.
+- **Woordvormen** (optioneel, voor termen vanaf 4 letters): *amateurkunst*
+  vindt dan ook *amateurkunstenaars*.
+- **Jaren met archief**: per gemeente tellen alleen de jaren mee waarin het
+  archief minstens 50 documenten heeft, en het lopende jaar naar rato. Zo
+  worden gemeenten met een later begonnen of onvolledig archief niet
+  benadeeld. Het profiel en de ranking tonen vanaf welk jaar er een archief is.
 - **Per 1.000 raadsdocumenten**: de noemer is het aantal documenten van die
   gemeente in dezelfde periode. Gemeenten met minder dan 400 documenten per
-  jaar tellen bij deze maatstaf niet mee.
-- **Per 100.000 inwoners**: alleen voor gemeenten vanaf 20.000 inwoners.
-  Kleinere gemeenten produceren ongeveer evenveel raadsstukken en zouden
-  anders bovenaan staan.
+  jaar met archief tellen bij deze maatstaf niet mee.
+- **Per 100.000 inwoners per jaar**: gedeeld door de jaren met archief, en
+  alleen voor gemeenten vanaf 20.000 inwoners. Kleinere gemeenten produceren
+  ongeveer evenveel raadsstukken en zouden anders bovenaan staan.
+- **Bandbreedte en ranking**: bij elke waarde staat een 95%-interval (exact
+  Poisson). Bij weinig treffers is dat breed. Gemeenten met minder dan 10
+  treffers krijgen geen rang, omdat hun plek vooral toeval is. Een gemeente
+  met archief maar 0 treffers telt als echte nul.
+- **Validatie**: met [`scripts/validatie.R`](scripts/validatie.R) trek je per
+  term een willekeurige steekproef van treffers om te beoordelen ("gaat dit
+  over het onderwerp?"). Het script berekent daarna de precisie per term.
 - **Budget**: de gemeentelijke lasten per inwoner voor de taakvelden 5.3
   cultuur, 5.4 musea, 5.5 erfgoed en 5.6 media/bibliotheek. Bron: de
   Iv3-gemeentefinanciën van het CBS (jaarrekening 2023/2024, begroting
@@ -125,14 +146,15 @@ testthat::test_dir("tests/testthat")
 
 - **Niet alle gemeenten doen mee:** 51 van de 342 gemeenten hebben geen
   archief in OpenBesluitvorming, en die zijn grijs op de kaart.
-- **Archieven gaan niet even ver terug:** vergelijk daarom liefst binnen één
-  periode, bijvoorbeeld de laatste vijf jaar.
+- **Archieven gaan niet even ver terug of hebben gaten:** de app deelt alleen
+  door de jaren met archief, maar vergelijk liefst binnen één periode.
 - **Fusiegemeenten:** de archieven van opgeheven gemeenten (Weesp, Beemster,
   Cuijk, Boxmeer, Brielle, …) tellen mee bij de huidige gemeente, maar lopen
   maar tot de fusiedatum.
 - **Limiet op verzoeken:** de API van OpenBesluitvorming heeft een limiet.
   Bij veel zoekvragen kort na elkaar krijg je een melding (HTTP 429). Probeer
-  het dan een paar minuten later opnieuw.
+  het dan ongeveer 10 minuten later opnieuw. De standaardvragen en themasets
+  zijn voorberekend en werken dan gewoon.
 - **Aandacht is geen beleid:** een vermelding kan in een besluit staan, maar
   ook in een bijlage of een motie die is verworpen. Het gemeenteprofiel toont
   de zinnen, zodat je dat kunt nagaan.
@@ -147,9 +169,10 @@ R/cbs.R            inwoners en cultuurlasten (CBS)
 R/geo.R            gemeentegrenzen (PDOK)
 R/kaart.R          kaartopbouw
 R/plots.R          grafieken
-R/cache.R          schijf- en geheugencache
-R/voorberekend.R   nachtelijk voorberekende data lezen
-scripts/           nachtelijke voorberekening (GitHub Action)
+R/cache.R          schijf-, geheugen- en procescache
+R/ranking.R        ranking met bandbreedte
+R/voorberekend.R   nachtelijk voorberekende data lezen en controleren
+scripts/           nachtelijke voorberekening (GitHub Action) en validatie
 R/export.R         CSV-export
 R/namen.R          naamnormalisatie en opmaak
 tests/testthat/    tests

@@ -95,15 +95,11 @@ overzicht <- list()
 for (naam in names(voorberekende_sets())) {
   termen <- voorberekende_sets()[[naam]]
   message("Zoekvraag ", naam, ": ", paste(termen, collapse = ", "))
+  # Het resultaat bevat ook de trends van alle gemeenten
   res <- probeer(naam, \() haal_data_op(termen, standaard_periode(), STANDAARD_OPTIES))
   Sys.sleep(PAUZE)
-  trends <- if (!is.null(res)) {
-    probeer(paste(naam, "trends"),
-            \() haal_trends_alle(termen, standaard_periode(), STANDAARD_OPTIES))
-  }
-  Sys.sleep(PAUZE)
 
-  rij <- if (!is.null(res) && !is.null(trends)) {
+  rij <- if (!is.null(res)) {
     data.frame(
       set = naam, termen = paste(termen, collapse = ", "),
       periode = paste(standaard_periode(), collapse = "-"),
@@ -122,9 +118,22 @@ for (naam in names(voorberekende_sets())) {
     if (nrow(v) == 1) overzicht[[naam]] <- v
     next
   }
-  res$trends <- trends
   bewaar(res, sprintf("zoek_%s.rds", rij$sleutel))
   overzicht[[naam]] <- rij
+
+  # Archieven zonder CBS-gemeente: meestal een nieuwe fusie of een afwijkende
+  # naam. Die tellen als losse 'gemeente' zonder kaart en inwoners; melden,
+  # zodat FUSIES of CBS_NAAM_NAAR_KEY (R/config.R) kan worden aangevuld.
+  if (naam == "Standaard") {
+    onbekend <- res$per_gemeente$key[is.na(res$per_gemeente$gemeentecode)]
+    onbekend_pad <- file.path(uitvoer, "..", "onbekend.txt")
+    if (length(onbekend) > 0) {
+      message("Archieven zonder CBS-gemeente: ", paste(onbekend, collapse = ", "))
+      writeLines(onbekend, onbekend_pad)
+    } else if (file.exists(onbekend_pad)) {
+      file.remove(onbekend_pad)
+    }
+  }
 }
 
 if (length(overzicht) > 0) {

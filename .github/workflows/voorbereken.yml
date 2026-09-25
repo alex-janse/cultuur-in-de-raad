@@ -56,6 +56,12 @@ jobs:
           # Alleen de laatste versie bewaren, zodat de repository klein blijft
           git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" data
 
+      - name: Archieven zonder CBS-gemeente melden
+        run: |
+          if [ -f onbekend.txt ]; then
+            echo "::warning::Archieven zonder CBS-gemeente (vul FUSIES of CBS_NAAM_NAAR_KEY aan in R/config.R): $(paste -sd, onbekend.txt)"
+          fi
+
       - name: Controle op onderdelen die niet zijn bijgewerkt
         run: |
           if [ -f mislukt.txt ]; then

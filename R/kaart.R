@@ -10,27 +10,39 @@ maatstaf_kolom <- function(maatstaf) {
          absoluut = "totaal")
 }
 
-# Grenzen (sf) + resultaten per gemeente -> sf met waarde en tooltip
+# Kleur voor gemeenten zonder (bruikbare) gegevens: duidelijk anders dan de
+# lichtste kleur van de schaal, die een echte (lage) waarde of 0 betekent
+GEEN_DATA_KLEUR <- "#b3b3b3"
+
+# Grenzen (sf) + resultaten per gemeente -> sf met waarde en tooltip.
+# Een gemeente met archief maar 0 treffers krijgt waarde 0 (een echte nul);
+# alleen zonder archief of met te weinig documenten blijft het grijs.
 maak_kaart_df <- function(grenzen, per_gemeente, maatstaf) {
   kolom <- maatstaf_kolom(maatstaf)
+  cijfers <- if (maatstaf == "absoluut") 0 else 1
   grenzen |>
     left_join(per_gemeente |>
-                filter(totaal > 0) |>
-                mutate(waarde = .data[[kolom]]) |>
-                select(gemeentecode, key, gemeente, totaal, waarde),
+                mutate(waarde = .data[[kolom]], heeft_archief = TRUE) |>
+                select(gemeentecode, key, gemeente, totaal, waarde,
+                       weinig_treffers, heeft_archief),
               by = "gemeentecode") |>
     mutate(
       gemeente = coalesce(gemeente, grensnaam),
-      label = ifelse(
-        is.na(waarde),
-        sprintf("<b>%s</b><br>geen (betrouwbare) gegevens",
-                htmltools::htmlEscape(gemeente)),
-        sprintf("<b>%s</b><br>%s %s<br><small>%s documenten</small>",
-                htmltools::htmlEscape(gemeente),
-                fmt(waarde, if (maatstaf == "absoluut") 0 else 1),
-                EENHEDEN[[maatstaf]], fmt(totaal, 0))
+      naam = htmltools::htmlEscape(gemeente),
+      label = case_when(
+        is.na(heeft_archief) ~
+          sprintf("<b>%s</b><br>geen raadsarchief in OpenBesluitvorming", naam),
+        is.na(waarde) ~
+          sprintf("<b>%s</b><br>te weinig documenten of inwoners voor deze maatstaf",
+                  naam),
+        TRUE ~
+          sprintf("<b>%s</b><br>%s %s<br><small>%s documenten%s</small>",
+                  naam, fmt(waarde, cijfers), EENHEDEN[[maatstaf]],
+                  fmt(totaal, 0),
+                  ifelse(weinig_treffers, " · te weinig voor een rang", ""))
       )
-    )
+    ) |>
+    select(-naam)
 }
 
 # Vlakken + legenda toevoegen aan een leaflet-kaart of -proxy
@@ -40,10 +52,10 @@ voeg_kaartlagen_toe <- function(kaart, kaart_df, maatstaf) {
                             na.rm = TRUE))
   pal <- if (length(breaks) >= 2) {
     colorBin("RdPu", domain = kaart_df$waarde, bins = breaks,
-             na.color = "#e6e6e6")
+             na.color = GEEN_DATA_KLEUR)
   } else {
     # Eén unieke waarde (of geen): een schaal van 0 tot die waarde
-    colorNumeric("RdPu", domain = c(0, max(1, breaks)), na.color = "#e6e6e6")
+    colorNumeric("RdPu", domain = c(0, max(1, breaks)), na.color = GEEN_DATA_KLEUR)
   }
   cijfers <- if (maatstaf == "absoluut") 0 else 1
   # Legenda in Nederlandse notatie (labelFormat kent geen decimale komma)
@@ -66,7 +78,7 @@ voeg_kaartlagen_toe <- function(kaart, kaart_df, maatstaf) {
     ) |>
     addLegend("bottomright", pal = pal, values = kaart_df$waarde,
               title = EENHEDEN[[maatstaf]], opacity = 0.8,
-              na.label = "geen data",
+              na.label = "geen gegevens",
               labFormat = legenda_labels)
 }
 

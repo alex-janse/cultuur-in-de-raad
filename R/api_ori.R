@@ -13,8 +13,14 @@ escape_qs <- function(x) {
   gsub('([-+=&|><!(){}\\[\\]^"~*?:\\\\/])', "\\\\\\1", x, perl = TRUE)
 }
 
+is_cultuurterm <- function(term) {
+  woorden <- strsplit(tolower(term), "[^[:alnum:]]+")[[1]]
+  term %in% CULTUURWOORDEN ||
+    any(grepl(CULTUUR_STAMMEN, woorden) & !grepl(GEEN_CULTUUR, woorden))
+}
+
 context_nodig <- function(term, opties) {
-  isTRUE(opties$context) && !grepl(CULTUUR_REGEX, term)
+  isTRUE(opties$context) && !is_cultuurterm(term)
 }
 
 term_query <- function(term, opties = STANDAARD_OPTIES) {
@@ -23,17 +29,21 @@ term_query <- function(term, opties = STANDAARD_OPTIES) {
     nchar(term) >= MIN_TEKENS_WOORDVORMEN
 
   if (context_nodig(term, opties)) {
-    # 'intervals' zoekt binnen één veld; de volledige tekst is het relevante
+    # 'intervals' werkt per veld; per veld (titel, beschrijving, tekst) dezelfde
+    # eis, zodat contexttermen net zo breed zoeken als de andere termen
     kern <- if (woordvorm) {
       list(prefix = list(prefix = term))
     } else {
       list(match = list(query = term, ordered = TRUE, max_gaps = 0))
     }
     cultuur <- lapply(CULTUURWOORDEN, \(w) list(match = list(query = w)))
-    return(list(intervals = list(text = list(all_of = list(
-      ordered = FALSE, max_gaps = CONTEXT_AFSTAND,
-      intervals = list(kern, list(any_of = list(intervals = cultuur)))
-    )))))
+    per_veld <- lapply(VELDEN, function(veld) {
+      list(intervals = setNames(list(list(all_of = list(
+        ordered = FALSE, max_gaps = CONTEXT_AFSTAND,
+        intervals = list(kern, list(any_of = list(intervals = cultuur)))
+      ))), veld))
+    })
+    return(list(bool = list(should = per_veld, minimum_should_match = 1)))
   }
 
   if (woordvorm) {
@@ -196,8 +206,71 @@ parse_jaren <- function(buckets, termen, dedup = FALSE) {
   }))
 }
 
-# Eén request: archiefgrootte + treffers per gemeente en per jaar, en de
-# 100 nieuwste treffers (post_filter raakt alleen de hits, niet de aggregaties).
+
+# --- Dekking en onzekerheid ---------------------------------------------------
+
+# Per gemeente: vanaf welk jaar er een archief is, en over hoeveel jaren er
+# in de gekozen periode echt documenten zijn. Een jaar telt als het minstens
+# MIN_DOCS_DEKKING documenten heeft; het lopende jaar telt naar rato mee.
+# Zo worden gemeenten die later instromen niet benadeeld.
+dekking_per_gemeente <- function(trends, vandaag = Sys.Date()) {
+  jaar_nu <- as.integer(format(vandaag, "%Y"))
+  fractie_nu <- as.numeric(format(vandaag, "%j")) / 365
+  trends |>
+    filter(term == "__alle__", archief >= MIN_DOCS_DEKKING) |>
+    group_by(key) |>
+    summarise(eerste_jaar = min(jaar),
+              jaren_dekking = sum(ifelse(jaar == jaar_nu, fractie_nu, 1)),
+              .groups = "drop")
+}
+
+# Lengte van een periode in jaren, met het lopende jaar naar rato (zelfde
+# rekenwijze als jaren_dekking)
+periode_jaren <- function(jaren, vandaag = Sys.Date()) {
+  jaar_nu <- as.integer(format(vandaag, "%Y"))
+  j <- seq(jaren[1], min(jaren[2], jaar_nu))
+  sum(ifelse(j == jaar_nu, as.numeric(format(vandaag, "%j")) / 365, 1))
+}
+
+# 95%-betrouwbaarheidsinterval voor een telling (Poisson, exact), omgerekend
+# naar dezelfde schaal als de maatstaf. Bij kleine aantallen is dat breed.
+poisson_interval <- function(n, noemer, schaal) {
+  laag <- ifelse(n == 0, 0, stats::qchisq(0.025, 2 * n) / 2)
+  hoog <- stats::qchisq(0.975, 2 * (n + 1)) / 2
+  list(laag = schaal * laag / noemer, hoog = schaal * hoog / noemer)
+}
+
+# Maatstaven per gemeente: per 1.000 raadsdocumenten en per 100.000
+# inwoners per jaar (over de jaren met dekking), met bandbreedte.
+bereken_maatstaven <- function(per_gemeente) {
+  per_gemeente |>
+    mutate(
+      genoeg_archief = !is.na(jaren_dekking) & jaren_dekking >= 1 &
+        archief >= MIN_DOCS_PER_JAAR * jaren_dekking,
+      per_1000 = ifelse(genoeg_archief, 1000 * totaal / archief, NA_real_),
+      per_1000_laag = ifelse(genoeg_archief,
+                             poisson_interval(totaal, archief, 1000)$laag, NA_real_),
+      per_1000_hoog = ifelse(genoeg_archief,
+                             poisson_interval(totaal, archief, 1000)$hoog, NA_real_),
+      genoeg_inwoners = genoeg_archief & !is.na(inwoners) & inwoners >= MIN_INWONERS,
+      per_100k = ifelse(genoeg_inwoners,
+                        1e5 * totaal / inwoners / jaren_dekking, NA_real_),
+      per_100k_laag = ifelse(genoeg_inwoners,
+                             poisson_interval(totaal, inwoners * jaren_dekking, 1e5)$laag,
+                             NA_real_),
+      per_100k_hoog = ifelse(genoeg_inwoners,
+                             poisson_interval(totaal, inwoners * jaren_dekking, 1e5)$hoog,
+                             NA_real_),
+      # Te weinig treffers voor een betekenisvolle plek in de ranking
+      weinig_treffers = totaal < MIN_TREFFERS_RANG
+    ) |>
+    select(-genoeg_archief, -genoeg_inwoners)
+}
+
+# Eén request: per gemeente archiefgrootte, treffers per term en dezelfde
+# cijfers per jaar, plus de 100 nieuwste treffers (post_filter raakt alleen de
+# hits, niet de aggregaties). De landelijke trend is de som van de gemeenten:
+# zo worden identieke stukken van verschillende gemeenten niet samengevoegd.
 haal_data_op <- function(termen, jaren, opties = STANDAARD_OPTIES) {
   body <- list(
     size = MAX_DOCS,
@@ -208,27 +281,36 @@ haal_data_op <- function(termen, jaren, opties = STANDAARD_OPTIES) {
     post_filter = of_query(termen, opties),
     aggs = list(
       gemeenten = list(terms = list(field = "_index", size = 1000),
-                       aggs = c(list(t = treffer_filters(termen, opties)),
-                                telling_aggs(opties$dedup))),
-      jaren = jaren_agg(termen, opties)
+                       aggs = c(list(t = treffer_filters(termen, opties),
+                                     jaren = jaren_agg(termen, opties)),
+                                telling_aggs(opties$dedup)))
     )
   )
   json <- post_json(body)
 
   g_buckets <- json$aggregations$gemeenten$buckets
-  j_buckets <- json$aggregations$jaren$buckets
-  if (is.null(g_buckets) || is.null(j_buckets) || is.null(json$hits)) {
+  if (is.null(g_buckets) || is.null(json$hits)) {
     stop("Onverwachte JSON-structuur (geen 'aggregations' of 'hits').")
   }
   if (length(g_buckets) == 0) stop("Geen documenten gevonden in deze periode.")
 
-  per_gemeente <- bind_rows(lapply(g_buckets, function(b) {
+  per_index <- lapply(g_buckets, function(b) {
     n <- bucket_tellingen(b, termen, opties$dedup)
     ruw <- index_naar_ruw(b$key)
-    tibble(key = ruw_naar_key(ruw), ruw = ruw,
-           archief = tel(b, opties$dedup), totaal = n[["__alle__"]],
-           !!!as.list(n[termen]))
-  })) |>
+    key <- ruw_naar_key(ruw)
+    list(
+      totaal = tibble(key = key, ruw = ruw, archief = tel(b, opties$dedup),
+                      totaal = n[["__alle__"]], !!!as.list(n[termen])),
+      trend = parse_jaren(b$jaren$buckets, termen, opties$dedup) |>
+        mutate(key = key)
+    )
+  })
+
+  # Stadsdelen en fusiegemeenten optellen bij de huidige gemeente
+  trends <- bind_rows(lapply(per_index, `[[`, "trend")) |>
+    group_by(key, jaar, term) |>
+    summarise(n = sum(n), archief = sum(archief), .groups = "drop")
+  per_gemeente <- bind_rows(lapply(per_index, `[[`, "totaal")) |>
     group_by(key) |>
     summarise(ruw = list(unique(ruw)),
               across(c(archief, totaal, all_of(termen)), sum),
@@ -241,16 +323,11 @@ haal_data_op <- function(termen, jaren, opties = STANDAARD_OPTIES) {
            inwoners_jaar = character())
   })
 
-  n_jaren <- jaren[2] - jaren[1] + 1
   per_gemeente <- per_gemeente |>
+    left_join(dekking_per_gemeente(trends), by = "key") |>
     left_join(inwoners, by = "key") |>
-    mutate(
-      gemeente = coalesce(cbs_naam, nette_naam(key)),
-      per_1000 = ifelse(archief >= MIN_DOCS_PER_JAAR * n_jaren,
-                        1000 * totaal / archief, NA_real_),
-      per_100k = ifelse(inwoners >= MIN_INWONERS,
-                        1e5 * totaal / inwoners / n_jaren, NA_real_)
-    ) |>
+    mutate(gemeente = coalesce(cbs_naam, nette_naam(key))) |>
+    bereken_maatstaven() |>
     arrange(desc(totaal))
 
   docs <- bind_rows(lapply(json$hits$hits, function(h) {
@@ -270,7 +347,10 @@ haal_data_op <- function(termen, jaren, opties = STANDAARD_OPTIES) {
 
   list(
     per_gemeente = per_gemeente,
-    jaren_nl = parse_jaren(j_buckets, termen, opties$dedup),
+    trends = trends,
+    jaren_nl = trends |>
+      group_by(jaar, term) |>
+      summarise(n = sum(n), archief = sum(archief), .groups = "drop"),
     docs = docs,
     totaal_docs = sum(per_gemeente$totaal),
     termen = termen,
@@ -280,37 +360,6 @@ haal_data_op <- function(termen, jaren, opties = STANDAARD_OPTIES) {
     berekend_op = Sys.time(),
     schema = SCHEMA_VERSIE
   )
-}
-
-# Trend voor één gemeente (alleen de indexen van die gemeente doorzoeken)
-haal_trend_gemeente <- function(ruwe_namen, termen, jaren,
-                                opties = STANDAARD_OPTIES) {
-  body <- list(size = 0, query = periode_query(jaren),
-               aggs = list(jaren = jaren_agg(termen, opties)))
-  json <- post_json(body, index = index_patroon(ruwe_namen))
-  buckets <- json$aggregations$jaren$buckets
-  if (is.null(buckets)) stop("Onverwachte JSON-structuur voor trend.")
-  parse_jaren(buckets, termen, opties$dedup)
-}
-
-# Trends van álle gemeenten in één verzoek (gemeente > jaar > term). Zwaar
-# (~10 s, ~15 MB JSON), daarom alleen voor de nachtelijke voorberekening.
-haal_trends_alle <- function(termen, jaren, opties = STANDAARD_OPTIES) {
-  body <- list(size = 0, query = periode_query(jaren),
-               aggs = list(gemeenten = list(
-                 terms = list(field = "_index", size = 1000),
-                 aggs = list(jaren = jaren_agg(termen, opties)))))
-  json <- post_json(body)
-  buckets <- json$aggregations$gemeenten$buckets
-  if (is.null(buckets)) stop("Onverwachte JSON-structuur voor trends.")
-
-  bind_rows(lapply(buckets, function(b) {
-    parse_jaren(b$jaren$buckets, termen, opties$dedup) |>
-      mutate(key = ruw_naar_key(index_naar_ruw(b$key)))
-  })) |>
-    # stadsdelen en fusiegemeenten optellen bij de huidige gemeente
-    group_by(key, jaar, term) |>
-    summarise(n = sum(n), archief = sum(archief), .groups = "drop")
 }
 
 # Nieuwste treffers van één gemeente met de zinnen waarin een term voorkomt.
