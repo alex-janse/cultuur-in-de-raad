@@ -66,7 +66,9 @@ TERMEN <- list(
                     "kunstenplan", "bibliotheek"),
   "Aanverwante termen" = c("talentontwikkeling", "cultuurparticipatie",
                            "muziekonderwijs", "muziekschool", "podiumkunsten",
-                           "cultuurbeleid", "erfgoed")
+                           "cultuurbeleid", "erfgoed"),
+  "Landelijke regelingen" = c("cultuureducatie met kwaliteit", "cultuurcoach",
+                              "combinatiefunctionaris", "impuls muziekonderwijs")
 )
 STANDAARD_TERMEN <- c("amateurkunst", "cultuurbeoefening", "talentontwikkeling")
 
@@ -81,8 +83,30 @@ THEMASETS <- list(
   "Cultuuronderwijs" = c("cultuureducatie", "muziekonderwijs", "muziekschool"),
   "Talent & podium" = c("talentontwikkeling", "podiumkunsten"),
   "Bibliotheek & erfgoed" = c("bibliotheek", "erfgoed"),
-  "Cultuurbeleid" = c("cultuurbeleid", "kunstenplan")
+  "Cultuurbeleid" = c("cultuurbeleid", "kunstenplan"),
+  # Landelijke regelingen voor cultuureducatie en -participatie. Een
+  # combinatiefunctionaris werkt vaak (ook) in sport of onderwijs; die term
+  # krijgt daarom de contexteis, de andere gaan zelf al over cultuur.
+  "Landelijke regelingen" = c("cultuureducatie met kwaliteit", "cultuurcoach",
+                              "combinatiefunctionaris", "impuls muziekonderwijs")
 )
+
+# --- Huisstijl (kleuren en lettertypen van LKCA, zonder logo of naam) --------
+KLEUR <- c(
+  paars = "#5C1A82", paars_donker = "#3E0F59", paars_licht = "#EFE6F5",
+  geel = "#FFED00", blauw = "#006CB2", tekst = "#272727", vlak = "#F0F0F0"
+)
+# Kaart: van licht naar donker paars (5 klassen)
+PALET_KAART <- c("#F1E8F6", "#D2B6E3", "#A876C6", "#7B3AA2", "#4A1268")
+# Reeksen in grafieken (gemeenten, termen): paars, blauw, donkergeel, grijs
+PALET_REEKSEN <- c("#5C1A82", "#006CB2", "#C9A800", "#6B6B6B", "#A876C6")
+
+# --- Vergelijkbare gemeenten ------------------------------------------------
+# Grootteklassen op inwonertal; een rang binnen de eigen klasse is eerlijker
+# dan tegen alle gemeenten
+GROOTTEKLASSEN <- c(0, 20000, 50000, 100000, Inf)
+GROOTTEKLASSE_NAMEN <- c("tot 20.000 inwoners", "20.000–50.000 inwoners",
+                         "50.000–100.000 inwoners", "100.000+ inwoners")
 
 # Cultuurcontext: een term telt alleen als er binnen CONTEXT_AFSTAND woorden
 # een van deze woorden staat. Zonder deze eis gaat bv. 'talentontwikkeling'

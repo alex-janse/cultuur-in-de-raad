@@ -33,3 +33,7 @@ R Shiny-dashboard over kunst- en cultuurthema's in Nederlandse gemeenteraden
       zware tests i.v.m. HTTP 429), laten beoordelen door iemand met kennis van het veld,
       daarna `scripts/validatie.R bereken <csv>` en de precisie per term in README en
       uitleg zetten. Wacht op de gebruiker.
+- [ ] Telefoonweergave controleren en verbeteren (smalle zijbalk, kaarthoogte,
+      brede tabellen); geparkeerd op verzoek van de gebruiker.
+- [ ] Huisstijl: alleen kleuren en lettertypen van LKCA (Barlow/Heebo als vrije
+      vervangers van DIN). Géén logo of naam LKCA zonder expliciet akkoord.

@@ -50,7 +50,7 @@ plot_trend <- function(df, termen, jaren, relatief = TRUE, titel = NULL,
     scale_x_continuous(breaks = seq(jaren[1], jaren[2], by = stap)) +
     scale_y_continuous(labels = \(x) fmt(x, if (relatief) 1 else 0),
                        limits = c(0, NA)) +
-    scale_colour_brewer(palette = "Dark2") +
+    scale_colour_manual(values = PALET_REEKSEN) +
     labs(
       title = titel, x = NULL, colour = NULL,
       y = if (relatief) "Documenten per 1.000 raadsdocumenten"
@@ -95,10 +95,10 @@ plot_budget <- function(df, jaren, aandacht_label, budget_label) {
 }
 
 PROFIELKLEUREN <- c(
-  "Veel aandacht, weinig budget" = "#c2378f",
-  "Veel budget, weinig aandacht" = "#2b7bba",
-  "Veel aandacht, veel budget"   = "#5a3e8c",
-  "Weinig aandacht, weinig budget" = "grey55"
+  "Veel aandacht, weinig budget" = "#5C1A82",
+  "Veel budget, weinig aandacht" = "#006CB2",
+  "Veel aandacht, veel budget"   = "#A876C6",
+  "Weinig aandacht, weinig budget" = "#B3B3B3"
 )
 
 # Aandacht + budget per gemeente -> percentielrangen en profiel
@@ -146,7 +146,7 @@ plot_budget_trend <- function(lasten, code, naam) {
     geom_col(position = position_dodge(width = 0.8), width = 0.75, na.rm = TRUE) +
     geom_text(aes(label = paste0("€", fmt(euro, 0))), na.rm = TRUE,
               position = position_dodge(width = 0.8), vjust = -0.4, size = 3.6) +
-    scale_fill_manual(values = setNames(c("#c2378f", "grey65"),
+    scale_fill_manual(values = setNames(c(KLEUR[["paars"]], "#B3B3B3"),
                                         c(naam, "Mediaan alle gemeenten"))) +
     scale_y_continuous(labels = \(x) paste0("€", fmt(x, 0)),
                        expand = expansion(mult = c(0, 0.12))) +

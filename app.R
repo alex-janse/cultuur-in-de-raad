@@ -6,19 +6,48 @@
 # Hulpfuncties staan in R/ en worden door Shiny automatisch geladen.
 # =============================================================================
 
+# Huisstijl: kleuren van LKCA (zie KLEUR in R/config.R), lettertypen Barlow
+# (koppen, lijkt op het DIN van LKCA) en Heebo (tekst) via Google Fonts
+LETTERTYPEN <- paste0(
+  "https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700",
+  "&family=Heebo:wght@400;500;700&display=swap"
+)
+
 CSS <- "
-mark { background: #f7d6ea; padding: 0 2px; border-radius: 2px; }
-.kerncijfers { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0 16px; }
-.kerncijfer { flex: 1 1 150px; background: #f7f7f9; border-radius: 6px;
+body { font-family: 'Heebo', -apple-system, 'Segoe UI', Roboto, sans-serif;
+       color: #272727; }
+h1, h2, h3, h4, .control-label, .nav-tabs > li > a, .btn {
+  font-family: 'Barlow', 'Heebo', sans-serif; }
+h2 { font-weight: 700; color: #5C1A82; }
+h3 { font-weight: 600; color: #5C1A82; margin-top: 24px; }
+a { color: #006CB2; }
+.well { background: #F0F0F0; border: none; box-shadow: none; }
+.btn-primary, .btn-primary:focus { background: #5C1A82; border-color: #5C1A82; }
+.btn-primary:hover, .btn-primary:active { background: #3E0F59; border-color: #3E0F59; }
+.nav-tabs > li.active > a, .nav-tabs > li.active > a:hover,
+.nav-tabs > li.active > a:focus { color: #5C1A82; font-weight: 600;
+  border-top: 3px solid #5C1A82; }
+input[type=checkbox], input[type=radio] { accent-color: #5C1A82; }
+.irs--shiny .irs-bar, .irs--shiny .irs-from, .irs--shiny .irs-to,
+.irs--shiny .irs-single { background: #5C1A82; border-color: #5C1A82; }
+mark { background: #FFF3A3; padding: 0 2px; border-radius: 2px; }
+.kerncijfers { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0 12px; }
+.kerncijfer { flex: 1 1 150px; background: #F0F0F0; border-radius: 6px;
               padding: 10px 14px; }
-.kerncijfer .waarde { font-size: 22px; font-weight: 600; color: #7a1f5c; }
-.kerncijfer .uitleg { font-size: 12px; color: #666; }
-.fragment { border-left: 3px solid #c2378f; padding: 4px 12px; margin: 10px 0; }
-.fragment .meta { font-size: 12px; color: #666; }
+.kerncijfer .waarde { font-family: 'Barlow', sans-serif; font-size: 24px;
+                      font-weight: 700; color: #5C1A82; }
+.kerncijfer .uitleg { font-size: 12px; color: #555; }
+.verhaal { background: #EFE6F5; border-left: 4px solid #5C1A82;
+           padding: 10px 16px; margin: 0 0 16px; font-size: 15px; }
+.verhaal p { margin: 4px 0; }
+.fragment { border-left: 3px solid #5C1A82; padding: 4px 12px; margin: 10px 0; }
+.fragment .meta { font-size: 12px; color: #555; }
 .knoppen { margin: 8px 0; }
-#tabel, #budget_tabel, #documenten { overflow-x: auto; }
-#tabel td { white-space: nowrap; }
-.testbalk { margin: 12px 0 0; padding: 8px 14px; }
+#budget_tabel, #documenten { overflow-x: auto; }
+.testbalk { margin: 12px 0 0; padding: 8px 14px; background: #FFED00;
+            border: none; color: #272727; }
+.uitleg-tekst { max-width: 760px; font-size: 15px; line-height: 1.6; }
+.ranking-kop { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
 "
 
 # --- Achtergrondproces voor live zoeken --------------------------------------
@@ -51,7 +80,12 @@ resultaat_cache <- cachem::cache_mem(max_age = 3600)
 ui <- function(request) {
   fluidPage(
     lang = "nl",
-    tags$head(tags$style(HTML(CSS))),
+    tags$head(
+      tags$link(rel = "preconnect", href = "https://fonts.gstatic.com",
+                crossorigin = NA),
+      tags$link(rel = "stylesheet", href = LETTERTYPEN),
+      tags$style(HTML(CSS))
+    ),
     useBusyIndicators(),
     if (TESTVERSIE) {
       div(class = "alert alert-warning testbalk", role = "status",
@@ -64,6 +98,9 @@ ui <- function(request) {
     sidebarLayout(
       sidebarPanel(
         width = 3,
+        selectizeInput("ga_naar", "Ga naar gemeente", choices = NULL,
+                       options = list(placeholder = "Typ een gemeentenaam…")),
+        hr(),
         selectInput("thema", "Thema",
                     choices = c("— eigen keuze —" = "", names(THEMASETS))),
         selectizeInput(
@@ -127,9 +164,21 @@ ui <- function(request) {
             leafletOutput("kaart", height = 520),
             helpText("Klik op een gemeente voor het gemeenteprofiel. Grijs:",
                      "geen archief of te weinig documenten voor deze maatstaf."),
-            div(class = "knoppen",
-                downloadButton("dl_ranking", "Ranking (CSV)")),
-            tableOutput("tabel")
+            div(class = "ranking-kop",
+                selectInput("klasse", "Vergelijk met",
+                            choices = c("Alle gemeenten" = "",
+                                        setNames(GROOTTEKLASSE_NAMEN,
+                                                 paste("Gemeenten met",
+                                                       GROOTTEKLASSE_NAMEN))),
+                            width = "280px"),
+                div(class = "knoppen form-group",
+                    downloadButton("dl_ranking", "Ranking (CSV)"))),
+            DT::DTOutput("tabel"),
+            helpText(paste("Bandbreedte: 95%-interval; overlappen twee",
+                           "bandbreedtes, dan is het verschil niet betekenisvol.",
+                           "Gemeenten met minder dan", MIN_TREFFERS_RANG,
+                           "treffers krijgen geen rang. Klik op een kolomkop",
+                           "om te sorteren."))
           ),
           tabPanel(
             "Trend", value = "trend",
@@ -153,6 +202,7 @@ ui <- function(request) {
             br(),
             selectInput("profiel_gemeente", "Gemeente", choices = NULL),
             uiOutput("profiel_kerncijfers"),
+            uiOutput("profiel_verhaal"),
             fluidRow(
               column(7, plotOutput("profiel_trend", height = 400)),
               column(5, plotOutput("profiel_budget", height = 400))
@@ -184,7 +234,8 @@ ui <- function(request) {
             div(class = "knoppen",
                 downloadButton("dl_docs", "Documenten (CSV)")),
             tableOutput("documenten")
-          )
+          ),
+          tabPanel("Uitleg", value = "uitleg", br(), uitleg_ui())
         )
       )
     )
@@ -241,6 +292,8 @@ server <- function(input, output, session) {
       selected = if (isTRUE(profiel_selectie %in% keuzes)) profiel_selectie
                  else met_treffers$key[which.max(met_treffers$totaal)]
     )
+    updateSelectizeInput(session, "ga_naar", choices = c("", keuzes),
+                         selected = "")
     if (nrow(met_treffers) == 0) {
       showNotification("Geen resultaten gevonden voor deze termen.",
                        type = "warning")
@@ -352,7 +405,9 @@ server <- function(input, output, session) {
     "ophalen", "thema", "budget_hover",
     "kaart_bounds", "kaart_center", "kaart_zoom", "kaart_shape_click",
     "kaart_shape_mouseover", "kaart_shape_mouseout", "kaart_click",
-    "trend_gebieden", "profiel_gemeente"
+    "trend_gebieden", "profiel_gemeente", "ga_naar",
+    "tabel_rows_current", "tabel_rows_all", "tabel_state", "tabel_search",
+    "tabel_cell_clicked", "tabel_rows_selected"
   ))
   # De link bewaart de zoekvraag van het getóónde resultaat (niet wat er
   # daarna eventueel in de invoervelden is veranderd), plus de keuzelijsten
@@ -451,7 +506,7 @@ server <- function(input, output, session) {
   gerangschikt <- reactive({
     res <- resultaat()
     req(res)
-    rangschik(res$per_gemeente, input$maatstaf)
+    rangschik(res$per_gemeente, input$maatstaf, input$klasse)
   })
 
   # --- Kaart ---
@@ -477,6 +532,13 @@ server <- function(input, output, session) {
       clearShapes() |>
       clearControls() |>
       voeg_kaartlagen_toe(kaart_df, input$maatstaf)
+  })
+
+  # Zoekvak 'Ga naar gemeente': direct naar het profiel
+  observeEvent(input$ga_naar, {
+    req(nzchar(input$ga_naar))
+    updateSelectInput(session, "profiel_gemeente", selected = input$ga_naar)
+    updateTabsetPanel(session, "tabs", selected = "profiel")
   })
 
   observeEvent(input$kaart_shape_click, {
@@ -510,34 +572,49 @@ server <- function(input, output, session) {
         across(all_of(res$termen)),
         `Archief (docs)` = archief,
         `Jaren met archief` = jaren_dekking,
-        Inwoners = inwoners
+        Inwoners = inwoners,
+        Grootteklasse = klasse
       )
   })
 
-  output$tabel <- renderTable({
+  # Alle gemeenten, sorteerbaar en doorzoekbaar. Getallen blijven getallen
+  # (goed sorteren); de opmaak (decimale komma) doet DT.
+  output$tabel <- DT::renderDT({
     df <- ranking_tabel()
     shiny::validate(need(nrow(df) > 0, "Geen resultaten."))
     cijfers <- if (input$maatstaf == "absoluut") 0 else 1
-    df |>
-      head(25) |>
+    termen <- resultaat()$termen
+    eenheid <- EENHEDEN[[input$maatstaf]]
+    tabel <- df |>
       transmute(
-        Rang = ifelse(is.na(Rang), "–", as.character(Rang)),
-        Gemeente,
-        !!EENHEDEN[[input$maatstaf]] := fmt(Waarde, cijfers),
+        Rang, Gemeente,
+        !!eenheid := Waarde,
         # 95%-interval: de echte waarde ligt met grote waarschijnlijkheid hierin
         Bandbreedte = paste0(fmt(`Bandbreedte laag`, cijfers), " – ",
                              fmt(`Bandbreedte hoog`, cijfers)),
-        Treffers = fmt(Totaal, 0),
-        across(all_of(resultaat()$termen), \(x) fmt(x, 0)),
-        # Jaren in de periode met archief (lopend jaar naar rato)
-        !!sprintf("Jaren archief (van %s)",
-                  fmt(periode_jaren(resultaat()$jaren))) := fmt(`Jaren met archief`),
-        Inwoners = fmt(Inwoners, 0)
+        Treffers = Totaal,
+        across(all_of(termen)),
+        `Jaren met archief` = `Jaren met archief`,
+        Inwoners
       )
-  }, striped = TRUE, hover = TRUE, align = "l",
-  caption = paste("Bandbreedte: 95%-interval. Gemeenten met minder dan",
-                  MIN_TREFFERS_RANG, "treffers krijgen geen rang (–)."),
-  caption.placement = "bottom")
+    DT::datatable(
+      tabel, rownames = FALSE, selection = "none",
+      options = list(
+        pageLength = 25, lengthMenu = c(25, 50, 100, 400),
+        order = list(), scrollX = TRUE,
+        language = list(
+          search = "Zoek gemeente:", lengthMenu = "Toon _MENU_ gemeenten",
+          info = "_START_–_END_ van _TOTAL_ gemeenten",
+          infoEmpty = "Geen gemeenten", infoFiltered = "(van _MAX_)",
+          zeroRecords = "Geen gemeente gevonden",
+          paginate = list(previous = "Vorige", `next` = "Volgende"))
+      )
+    ) |>
+      DT::formatRound(eenheid, digits = cijfers, mark = ".", dec.mark = ",") |>
+      DT::formatRound(c("Treffers", termen, "Inwoners"), digits = 0,
+                      mark = ".", dec.mark = ",") |>
+      DT::formatRound("Jaren met archief", digits = 1, mark = ".", dec.mark = ",")
+  })
 
   output$dl_ranking <- downloadHandler(
     filename = \() sprintf("cultuur-ranking-%s.csv", Sys.Date()),
@@ -616,9 +693,20 @@ server <- function(input, output, session) {
 
   output$profiel_kerncijfers <- renderUI({
     rij <- profiel_rij()
+    # Rang onder alle gemeenten, en binnen de eigen grootteklasse
     rang <- function(kolom) {
       maatstaf <- if (kolom == "per_1000") "relatief" else "inwoners"
-      rang_tekst(rangschik(resultaat()$per_gemeente, maatstaf), rij$key)
+      pg <- resultaat()$per_gemeente
+      tekst <- rang_tekst(rangschik(pg, maatstaf), rij$key)
+      klasse <- grootteklasse(rij$inwoners)
+      binnen <- if (!is.na(klasse)) {
+        rangschik(pg, maatstaf, klasse)
+      }
+      if (!is.null(binnen) && !is.na(binnen$rang[binnen$key == rij$key][1])) {
+        tekst <- paste0(tekst, "; ", rang_tekst(binnen, rij$key),
+                        " bij gemeenten met ", klasse)
+      }
+      tekst
     }
     # Uit het procesgeheugen of de nachtelijke voorberekening; meestal direct
     budget <- lasten_voor(IV3_KEUZES[[1]])
@@ -648,6 +736,19 @@ server <- function(input, output, session) {
           blok(paste0("€", fmt(euro, 0)),
                paste("cultuur per inwoner,", names(IV3_KEUZES)[1]))
         })
+  })
+
+  # Een paar zinnen in gewone taal (zie verhaal_gemeente in R/uitleg.R)
+  output$profiel_verhaal <- renderUI({
+    rij <- profiel_rij()
+    res <- resultaat()
+    zinnen <- verhaal_gemeente(
+      rij, res$per_gemeente, trend_voor(rij$key, res),
+      budget = lasten_voor(IV3_KEUZES[[1]]),
+      budget_label = names(IV3_KEUZES)[1]
+    )
+    req(length(zinnen) > 0)
+    div(class = "verhaal", lapply(zinnen, tags$p))
   })
 
   output$profiel_trend <- renderPlot({
