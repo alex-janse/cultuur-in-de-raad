@@ -8,7 +8,25 @@ MAX_DOCS <- 100          # aantal voorbeelddocumenten (limit=100)
 MIN_DOCS_PER_JAAR <- 400 # kleinere archieven geven onbetrouwbare relatieve cijfers
 MIN_INWONERS <- 20000    # zeer kleine gemeenten domineren anders 'per inwoner'
 EERSTE_JAAR <- 2010
-HUIDIG_JAAR <- as.integer(format(Sys.Date(), "%Y"))
+# Het jaar per aanroep bepalen, niet bij het laden: een proces kan over
+# 1 januari heen blijven draaien.
+huidig_jaar <- function() as.integer(format(Sys.Date(), "%Y"))
+
+# Standaardperiode van de app én van de nachtelijke voorberekening; op één
+# plek, zodat die twee niet uit elkaar kunnen lopen.
+STANDAARD_BEGINJAAR <- 2020L
+standaard_periode <- function() c(STANDAARD_BEGINJAAR, huidig_jaar())
+
+# Versies van de voorberekende data. SCHEMA_VERSIE ophogen bij een andere
+# structuur van het resultaat; de methode-versie volgt automatisch uit de
+# instellingen die de telling bepalen (zie methode_versie() onderaan).
+SCHEMA_VERSIE <- 1L
+# Voorberekende data ouder dan dit wordt niet meer gebruikt (dan live)
+MAX_LEEFTIJD_DAGEN <- 7
+WAARSCHUW_LEEFTIJD_DAGEN <- 2
+
+MAX_TERMEN <- 8               # meer termen = zwaardere zoekvraag voor de API
+MIN_TEKENS_WOORDVORMEN <- 4   # 'ku*' is duur en loopt tegen limieten aan
 
 CBS_TABEL_BEVOLKING <- "70072ned"  # Regionale kerncijfers Nederland
 
@@ -93,3 +111,13 @@ IV3_KEUZES <- c("Jaarrekening 2024" = "2024_rekening",
                 "Begroting 2026" = "2026_begroting",
                 "Begroting 2025" = "2025_begroting")
 IV3_TAAKVELDEN <- c("5.3", "5.4", "5.5", "5.6")   # cultuur, musea, erfgoed, media/bibliotheek
+
+# Korte vingerafdruk van alles wat de telling bepaalt. Verandert er iets
+# (bv. een cultuurwoord erbij), dan horen voorberekende resultaten niet meer
+# bij de app en worden ze niet gebruikt.
+methode_versie <- function() {
+  substr(rlang::hash(list(
+    CULTUURWOORDEN, CONTEXT_AFSTAND, CULTUUR_REGEX, MIN_DOCS_PER_JAAR,
+    MIN_INWONERS, FUSIES, CBS_NAAM_NAAR_KEY, MIN_TEKENS_WOORDVORMEN
+  )), 1, 8)
+}
