@@ -9,6 +9,12 @@ gemeenten doorzoekt via [OpenBesluitvorming.nl](https://openbesluitvorming.nl),
 en die combineert met open data van het CBS en PDOK. Alle bronnen zijn gratis
 en hebben geen API-sleutel nodig.
 
+**[Open het dashboard](https://01a0d57f-3a32-a4ab-9874-1761a480a727.share.connect.posit.cloud/)** ·
+[Projectpagina](https://alex-janse.github.io/cultuur-in-de-raad/)
+
+De app staat op Posit Connect Cloud (gratis). Bij de eerste bezoeker na een
+stille periode moet hij even opstarten.
+
 ![Kaart en ranking](docs/img/kaart.png)
 
 ## Wat kun je ermee?
