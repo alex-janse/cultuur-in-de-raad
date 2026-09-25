@@ -20,13 +20,18 @@ standaard_periode <- function() c(STANDAARD_BEGINJAAR, huidig_jaar())
 # Versies van de voorberekende data. SCHEMA_VERSIE ophogen bij een andere
 # structuur van het resultaat; de methode-versie volgt automatisch uit de
 # instellingen die de telling bepalen (zie methode_versie() onderaan).
-SCHEMA_VERSIE <- 1L
+SCHEMA_VERSIE <- 2L   # 2: trends per gemeente, dekking en bandbreedtes
 # Voorberekende data ouder dan dit wordt niet meer gebruikt (dan live)
 MAX_LEEFTIJD_DAGEN <- 7
 WAARSCHUW_LEEFTIJD_DAGEN <- 2
 
 MAX_TERMEN <- 8               # meer termen = zwaardere zoekvraag voor de API
 MIN_TEKENS_WOORDVORMEN <- 4   # 'ku*' is duur en loopt tegen limieten aan
+
+# Een jaar telt als 'gedekt' (archief aanwezig) vanaf zoveel documenten
+MIN_DOCS_DEKKING <- 50
+# Minder treffers dan dit: geen plek in de ranking (te toevallig)
+MIN_TREFFERS_RANG <- 10
 
 CBS_TABEL_BEVOLKING <- "70072ned"  # Regionale kerncijfers Nederland
 
@@ -63,8 +68,13 @@ CULTUURWOORDEN <- c(
   "amateurkunst", "cultuureducatie", "cultuurparticipatie", "cultuurcoach",
   "cultuurcoaches", "creatief", "creatieve"
 )
-# Termen die zelf al over cultuur gaan krijgen geen extra contexteis
-CULTUUR_REGEX <- "cultu|kunst|muziek|theater|muse|podium|erfgoed|dans"
+# Termen die zelf al over cultuur gaan krijgen geen extra contexteis: een
+# cultuurwoord, of een woord dat met een cultuurstam begint (cultuureducatie,
+# muziekonderwijs). Alleen aan het begin van een woord, zodat bv.
+# 'bedrijfscultuur' wél de contexteis krijgt. Samenstellingen met 'kunst' die
+# niet over kunst gaan zijn uitgezonderd.
+CULTUUR_STAMMEN <- "^(cultu|kunst|muziek|theater|muse|podium|erfgoed|dans)"
+GEEN_CULTUUR <- "^kunst(gras|werk|matig|stof|licht|mest|ijs|hars|been|gebit|heup)"
 
 MAATSTAVEN <- c("Per 1.000 raadsdocumenten" = "relatief",
                 "Per 100.000 inwoners (per jaar)" = "inwoners",
@@ -117,7 +127,8 @@ IV3_TAAKVELDEN <- c("5.3", "5.4", "5.5", "5.6")   # cultuur, musea, erfgoed, med
 # bij de app en worden ze niet gebruikt.
 methode_versie <- function() {
   substr(rlang::hash(list(
-    CULTUURWOORDEN, CONTEXT_AFSTAND, CULTUUR_REGEX, MIN_DOCS_PER_JAAR,
+    CULTUURWOORDEN, CONTEXT_AFSTAND, CULTUUR_STAMMEN, GEEN_CULTUUR,
+    MIN_DOCS_DEKKING, MIN_TREFFERS_RANG, MIN_DOCS_PER_JAAR,
     MIN_INWONERS, FUSIES, CBS_NAAM_NAAR_KEY, MIN_TEKENS_WOORDVORMEN
   )), 1, 8)
 }
