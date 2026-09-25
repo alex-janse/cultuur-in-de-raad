@@ -159,6 +159,30 @@ testthat::test_dir("tests/testthat")
   ook in een bijlage of een motie die is verworpen. Het gemeenteprofiel toont
   de zinnen, zodat je dat kunt nagaan.
 
+## Privacy en veiligheid
+
+- **Bron**: het dashboard toont gegevens uit openbare raadsstukken, zoals
+  gemeenten die publiceren en OpenBesluitvorming.nl ze beschikbaar maakt.
+- **Geen opslag**: het slaat zelf geen raadsstukken of gegevens van bezoekers
+  op; alleen een deelbare link bevat je zoekinstellingen.
+- **Geen fragmenten uit gevoelige stukken**: van stukken waarin vaak gegevens
+  van burgers staan (bezwaren, inspraak, zienswijzen, ingekomen brieven,
+  petities, Woo-verzoeken) toont het gemeenteprofiel geen tekstfragmenten,
+  alleen de titel met een link naar de bron. Herkenning gebeurt op de titel
+  (`PRIVACY_TITELS` in `R/config.R`).
+- **Verwijderen**: staat er iets over jou in een raadsstuk dat daar niet
+  hoort, dan kan dat alleen bij de bron worden verwijderd: de gemeente die het
+  stuk publiceerde, en OpenBesluitvorming.nl. Is het daar weg, dan verdwijnt
+  het hier vanzelf, uiterlijk na de volgende nachtelijke bijwerking.
+- **Veiligheid**:
+  - Tekst uit de bron wordt altijd zelf ge-escaped voordat die op de pagina
+    komt.
+  - Links worden alleen getoond als ze met `http(s)://` beginnen.
+  - CSV-downloads zijn beschermd tegen formules (`=`, `+`, `-`, `@`).
+  - Voorberekende bestanden worden alleen gebruikt als ze uitsluitend gewone
+    gegevens bevatten.
+  - De GitHub Actions staan vast op een specifieke versie (commit-SHA).
+
 ## Projectstructuur
 
 ```
