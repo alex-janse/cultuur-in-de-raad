@@ -16,6 +16,7 @@ mark { background: #f7d6ea; padding: 0 2px; border-radius: 2px; }
 .fragment { border-left: 3px solid #c2378f; padding: 4px 12px; margin: 10px 0; }
 .fragment .meta { font-size: 12px; color: #666; }
 .knoppen { margin: 8px 0; }
+#tabel, #budget_tabel, #documenten { overflow-x: auto; }
 "
 
 # --- Achtergrondproces voor live zoeken --------------------------------------
@@ -209,8 +210,10 @@ server <- function(input, output, session) {
     foutmelding(NULL)
     resultaat(res)
 
-    met_treffers <- res$per_gemeente |> filter(totaal > 0) |> arrange(gemeente)
-    keuzes <- setNames(met_treffers$key, met_treffers$gemeente)
+    # Alle gemeenten met een archief, ook die zonder treffers (een echte nul)
+    met_archief <- res$per_gemeente |> arrange(gemeente)
+    met_treffers <- met_archief |> filter(totaal > 0)
+    keuzes <- setNames(met_archief$key, met_archief$gemeente)
     trend_selectie <- trend_selectie %||% isolate(input$trend_gebieden)
     updateSelectizeInput(
       session, "trend_gebieden",
@@ -400,11 +403,7 @@ server <- function(input, output, session) {
   gerangschikt <- reactive({
     res <- resultaat()
     req(res)
-    res$per_gemeente |>
-      filter(totaal > 0) |>
-      mutate(waarde = .data[[maatstaf_kolom(input$maatstaf)]]) |>
-      filter(!is.na(waarde)) |>
-      arrange(desc(waarde))
+    rangschik(res$per_gemeente, input$maatstaf)
   })
 
   # --- Kaart ---
@@ -433,9 +432,9 @@ server <- function(input, output, session) {
     res <- resultaat()
     req(res)
     rij <- res$per_gemeente |>
-      filter(gemeentecode %in% input$kaart_shape_click$id, totaal > 0)
+      filter(gemeentecode %in% input$kaart_shape_click$id)
     if (nrow(rij) == 0) {
-      showNotification("Geen treffers of geen raadsarchief voor deze gemeente.",
+      showNotification("Van deze gemeente is geen raadsarchief beschikbaar.",
                        type = "warning")
       return()
     }
@@ -449,13 +448,17 @@ server <- function(input, output, session) {
     res <- resultaat()
     gerangschikt() |>
       transmute(
-        Rang = row_number(),
+        Rang = rang,
         Gemeente = gemeente,
+        Waarde = waarde,
+        `Bandbreedte laag` = waarde_laag,
+        `Bandbreedte hoog` = waarde_hoog,
         `Per 1.000 docs` = per_1000,
         `Per 100k inw./jaar` = per_100k,
         Totaal = totaal,
         across(all_of(res$termen)),
         `Archief (docs)` = archief,
+        `Jaren met archief` = jaren_dekking,
         Inwoners = inwoners
       )
   })
@@ -463,12 +466,27 @@ server <- function(input, output, session) {
   output$tabel <- renderTable({
     df <- ranking_tabel()
     shiny::validate(need(nrow(df) > 0, "Geen resultaten."))
+    cijfers <- if (input$maatstaf == "absoluut") 0 else 1
     df |>
       head(25) |>
-      mutate(across(c(`Per 1.000 docs`, `Per 100k inw./jaar`), fmt),
-             across(-c(Rang, Gemeente, `Per 1.000 docs`, `Per 100k inw./jaar`),
-                    \(x) fmt(x, 0)))
-  }, striped = TRUE, hover = TRUE, align = "l")
+      transmute(
+        Rang = ifelse(is.na(Rang), "–", as.character(Rang)),
+        Gemeente,
+        !!EENHEDEN[[input$maatstaf]] := fmt(Waarde, cijfers),
+        # 95%-interval: de echte waarde ligt met grote waarschijnlijkheid hierin
+        Bandbreedte = paste0(fmt(`Bandbreedte laag`, cijfers), " – ",
+                             fmt(`Bandbreedte hoog`, cijfers)),
+        Treffers = fmt(Totaal, 0),
+        across(all_of(resultaat()$termen), \(x) fmt(x, 0)),
+        # Jaren in de periode met archief (lopend jaar naar rato)
+        `Jaren met archief` = paste(fmt(`Jaren met archief`), "van",
+                                    fmt(periode_jaren(resultaat()$jaren))),
+        Inwoners = fmt(Inwoners, 0)
+      )
+  }, striped = TRUE, hover = TRUE, align = "l",
+  caption = paste("Bandbreedte: 95%-interval. Gemeenten met minder dan",
+                  MIN_TREFFERS_RANG, "treffers krijgen geen rang (–)."),
+  caption.placement = "bottom")
 
   output$dl_ranking <- downloadHandler(
     filename = \() sprintf("cultuur-ranking-%s.csv", Sys.Date()),
@@ -484,21 +502,9 @@ server <- function(input, output, session) {
     }
     rij <- res$per_gemeente |> filter(key == !!key)
     if (nrow(rij) != 1) return(NULL)
-    # Voorberekende resultaten bevatten de trends van alle gemeenten al
-    if (!is.null(res$trends)) {
-      return(res$trends |> filter(key == !!key) |> select(-key) |>
-               mutate(gebied = rij$gemeente))
-    }
-    tryCatch(
-      haal_trend_gemeente(rij$ruw[[1]], res$termen, res$jaren, res$opties) |>
-        mutate(gebied = rij$gemeente),
-      error = function(e) {
-        showNotification(sprintf("Trend voor %s ophalen mislukt: %s",
-                                 rij$gemeente, conditionMessage(e)),
-                         type = "error", duration = 8)
-        NULL
-      }
-    )
+    # Het resultaat bevat de trends van alle gemeenten
+    res$trends |> filter(key == !!key) |> select(-key) |>
+      mutate(gebied = rij$gemeente)
   }
 
   trend_plot <- reactive({
@@ -553,11 +559,8 @@ server <- function(input, output, session) {
   output$profiel_kerncijfers <- renderUI({
     rij <- profiel_rij()
     rang <- function(kolom) {
-      alle <- resultaat()$per_gemeente |>
-        filter(totaal > 0, !is.na(.data[[kolom]]))
-      if (is.na(rij[[kolom]])) return("niet gerangschikt")
-      sprintf("rang %d van %d", sum(alle[[kolom]] > rij[[kolom]]) + 1,
-              nrow(alle))
+      maatstaf <- if (kolom == "per_1000") "relatief" else "inwoners"
+      rang_tekst(rangschik(resultaat()$per_gemeente, maatstaf), rij$key)
     }
     # Uit het procesgeheugen of de nachtelijke voorberekening; meestal direct
     budget <- lasten_voor(IV3_KEUZES[[1]])
@@ -570,10 +573,18 @@ server <- function(input, output, session) {
     }
     div(class = "kerncijfers",
         blok(fmt(rij$per_1000),
-             paste("per 1.000 raadsdocumenten ·", rang("per_1000"))),
+             paste0("per 1.000 raadsdocumenten (bandbreedte ",
+                    fmt(rij$per_1000_laag), "–", fmt(rij$per_1000_hoog),
+                    ") · ", rang("per_1000"))),
         blok(fmt(rij$per_100k),
-             paste("per 100.000 inwoners per jaar ·", rang("per_100k"))),
-        blok(fmt(rij$totaal, 0), "documenten met een treffer"),
+             paste0("per 100.000 inwoners per jaar (bandbreedte ",
+                    fmt(rij$per_100k_laag), "–", fmt(rij$per_100k_hoog),
+                    ") · ", rang("per_100k"))),
+        blok(fmt(rij$totaal, 0),
+             if (is.na(rij$jaren_dekking)) "documenten met een treffer"
+             else sprintf("documenten met een treffer · archief in %s van %s jaar",
+                          fmt(rij$jaren_dekking),
+                          fmt(periode_jaren(resultaat()$jaren)))),
         blok(fmt(rij$inwoners, 0), "inwoners (CBS)"),
         if (!is.null(euro) && !is.na(euro)) {
           blok(paste0("€", fmt(euro, 0)),

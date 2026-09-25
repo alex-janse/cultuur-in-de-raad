@@ -24,7 +24,7 @@ privacypunt uit fase 2 hoort in die mail thuis.
 
 ---
 
-## Fase 0: Stabiel onder belasting (eerst)
+## Fase 0: Stabiel onder belasting — afgerond (PR #1)
 Doel: de app blijft werken als meerdere mensen hem tegelijk gebruiken, en na updates.
 
 | # | Wat | Waar |
@@ -42,7 +42,7 @@ Klaar als: meerdere gelijktijdige sessies in de test blijven bruikbaar tijdens e
 zoekvraag of een gesimuleerde 429; een oud databestand leidt tot live ophalen, niet tot
 een crash; CI is groen.
 
-## Fase 1: Cijfers die kloppen (sector en journalistiek)
+## Fase 1: Cijfers die kloppen — afgerond (PR #2); 1.7 wacht op beoordeling van de steekproef
 Doel: een ranking die je kunt verdedigen.
 
 | # | Wat | Waar |

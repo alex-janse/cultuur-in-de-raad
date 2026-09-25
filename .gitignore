@@ -6,3 +6,7 @@ rsconnect/
 
 # Lokale cache van CBS/PDOK-data
 cache/
+
+# Validatie-steekproeven: bevatten fragmenten uit raadsstukken (mogelijk met
+# namen); niet in de openbare repository
+validatie/
