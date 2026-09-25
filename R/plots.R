@@ -32,10 +32,20 @@ plot_trend <- function(df, termen, jaren, relatief = TRUE, titel = NULL,
   volgorde <- c(if (length(termen) > 1) ALLE_TERMEN_LABEL, termen)
   df$term <- factor(df$term, levels = volgorde)
 
+  # Het lopende jaar is nog niet compleet: gestippelde lijn en open punt, zodat
+  # een (vooral absolute) daling niet als echte daling wordt gelezen
+  jaar_nu <- huidig_jaar()
+  df$lopend <- df$jaar == jaar_nu
+  met_lopend <- any(df$lopend)
+
   stap <- max(1, ceiling((jaren[2] - jaren[1]) / 8))
   ggplot(df, aes(jaar, waarde, colour = gebied)) +
-    geom_line(linewidth = 1, na.rm = TRUE) +
-    geom_point(size = 1.8, na.rm = TRUE) +
+    geom_line(data = \(d) d[d$jaar < jaar_nu, ], linewidth = 1, na.rm = TRUE) +
+    geom_line(data = \(d) d[d$jaar >= jaar_nu - 1, ], linewidth = 1,
+              linetype = "22", na.rm = TRUE) +
+    geom_point(aes(shape = lopend), size = 1.8, stroke = 1, fill = "white",
+               na.rm = TRUE) +
+    scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 21), guide = "none") +
     facet_wrap(~term, scales = "free_y") +
     scale_x_continuous(breaks = seq(jaren[1], jaren[2], by = stap)) +
     scale_y_continuous(labels = \(x) fmt(x, if (relatief) 1 else 0),
@@ -44,7 +54,10 @@ plot_trend <- function(df, termen, jaren, relatief = TRUE, titel = NULL,
     labs(
       title = titel, x = NULL, colour = NULL,
       y = if (relatief) "Documenten per 1.000 raadsdocumenten"
-          else "Aantal documenten"
+          else "Aantal documenten",
+      caption = if (met_lopend) {
+        sprintf("Open punt en stippellijn: %d is nog niet compleet.", jaar_nu)
+      }
     ) +
     thema_dashboard()
 }
