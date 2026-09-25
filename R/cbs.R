@@ -68,7 +68,7 @@ haal_cultuurlasten <- function(keuze = "2024_rekening") {
       stop(sprintf("CBS heeft (nog) geen Iv3-data voor %s.", keuze))
     }
 
-    inw_jaar <- min(jaar, HUIDIG_JAAR - 1)
+    inw_jaar <- min(jaar, huidig_jaar() - 1)
     inwoners <- cbs_get_data(
       "03759ned", Perioden = paste0(inw_jaar, "JJ00"), Geslacht = "T001038",
       Leeftijd = "10000", BurgerlijkeStaat = "T001019",

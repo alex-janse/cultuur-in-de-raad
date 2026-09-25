@@ -19,7 +19,8 @@ context_nodig <- function(term, opties) {
 
 term_query <- function(term, opties = STANDAARD_OPTIES) {
   enkel_woord <- !grepl("\\s", term)
-  woordvorm <- isTRUE(opties$woordvormen) && enkel_woord
+  woordvorm <- isTRUE(opties$woordvormen) && enkel_woord &&
+    nchar(term) >= MIN_TEKENS_WOORDVORMEN
 
   if (context_nodig(term, opties)) {
     # 'intervals' zoekt binnen één veld; de volledige tekst is het relevante
@@ -86,7 +87,7 @@ treffer_filters <- function(termen, opties = STANDAARD_OPTIES) {
 # Sommige documenten hebben een datum in de toekomst (bv. 31-12 als
 # placeholder); die laten we weg door nooit verder dan vandaag te kijken.
 periode_query <- function(jaren) {
-  tot <- if (jaren[2] >= HUIDIG_JAAR) "now+1d/d" else sprintf("%d-01-01", jaren[2] + 1)
+  tot <- if (jaren[2] >= huidig_jaar()) "now+1d/d" else sprintf("%d-01-01", jaren[2] + 1)
   list(bool = list(filter = list(list(range = list(last_discussed_at = list(
     gte = sprintf("%d-01-01", jaren[1]),
     lt  = tot
@@ -100,25 +101,55 @@ jaren_agg <- function(termen, opties = STANDAARD_OPTIES) {
                 telling_aggs(opties$dedup)))
 }
 
+# --- Blokkade door de API (HTTP 429) ---
+# Na een 429 blokkeert de API ~10 minuten. Opnieuw proberen verlengt dat
+# alleen, dus onthouden we de blokkade voor het hele proces (alle bezoekers)
+# en melden we het direct, zonder verzoek.
+API_BLOKKADE_MINUTEN <- 10
+api_status <- new.env()
+
+blokkade_tot <- function() {
+  tot <- api_status$blokkade_tot
+  if (!is.null(tot) && Sys.time() < tot) tot else NULL
+}
+
+zet_blokkade <- function(seconden = API_BLOKKADE_MINUTEN * 60) {
+  api_status$blokkade_tot <- Sys.time() + seconden
+}
+
+blokkade_fout <- function() {
+  minuten <- max(1, ceiling(as.numeric(difftime(blokkade_tot(), Sys.time(),
+                                                units = "mins"))))
+  rlang::abort(
+    sprintf(paste("De API van OpenBesluitvorming krijgt even te veel",
+                  "verzoeken (HTTP 429). Probeer het over ongeveer %d",
+                  "minuten opnieuw."), minuten),
+    class = "api_blokkade"
+  )
+}
+
 post_json <- function(body, index = "ori_*", pogingen = 2) {
   sleutel <- rlang::hash(list(index, body))
   bewaard <- ori_cache$get(sleutel)
   if (!cachem::is.key_missing(bewaard)) return(bewaard)
+  if (!is.null(blokkade_tot())) blokkade_fout()
 
   for (poging in seq_len(pogingen)) {
     resp <- request(API_BASIS) |>
       req_url_path_append(index, "_search") |>
       req_body_json(body) |>
-      req_timeout(90) |>
+      req_timeout(60) |>
       req_user_agent("cultuur-dashboard-mvp (R/httr2)") |>
-      req_retry(max_tries = 4, backoff = \(i) 2 * 2^i,
-                is_transient = \(r) resp_status(r) %in% c(429, 502, 503, 504)) |>
+      # Alleen korte serverstoringen opnieuw proberen, nooit een 429
+      req_retry(max_tries = 3, max_seconds = 30, backoff = \(i) 2^i,
+                is_transient = \(r) resp_status(r) %in% c(502, 503, 504)) |>
       req_error(is_error = function(r) FALSE) |>
       req_perform()
 
     if (resp_status(resp) == 429) {
-      stop("De API krijgt even te veel verzoeken (HTTP 429). ",
-           "Probeer het over een minuut opnieuw.")
+      wacht <- suppressWarnings(as.numeric(resp_header(resp, "Retry-After")))
+      zet_blokkade(if (isTRUE(wacht > 0)) wacht else API_BLOKKADE_MINUTEN * 60)
+      blokkade_fout()
     }
     if (resp_status(resp) >= 400) {
       stop(sprintf("API gaf HTTP %s terug.", resp_status(resp)))
@@ -245,7 +276,9 @@ haal_data_op <- function(termen, jaren, opties = STANDAARD_OPTIES) {
     termen = termen,
     jaren = jaren,
     opties = opties,
-    inwoners_ok = nrow(inwoners) > 0
+    inwoners_ok = nrow(inwoners) > 0,
+    berekend_op = Sys.time(),
+    schema = SCHEMA_VERSIE
   )
 }
 
