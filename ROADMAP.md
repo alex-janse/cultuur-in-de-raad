@@ -102,7 +102,7 @@ per term bekend (na het invullen door een vakinhoudelijk persoon).
 ## Werkwijze en verificatie
 - **Per fase een eigen branch en pull request**, zodat CI (0.7) meekijkt; na akkoord mergen,
   waarna Connect Cloud automatisch publiceert.
-- **Zuinig met de API** (CLAUDE.md): tests zonder netwerk met fixtures, en hooguit één
+- **Zuinig met de API**: tests zonder netwerk met fixtures, en hooguit één
   handmatige live-run per fase.
 - **Per fase**:
   - testthat;

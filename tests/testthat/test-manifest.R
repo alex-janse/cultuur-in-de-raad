@@ -1,5 +1,5 @@
 # Posit Connect Cloud publiceert alleen wat in manifest.json staat. Vergeet je
-# na een wijziging `rsconnect::writeManifest()` (zie CLAUDE.md), dan draait
+# na een wijziging `rsconnect::writeManifest()` (zie README), dan draait
 # online een andere versie dan je denkt. Deze tests vangen dat af.
 
 root <- test_path("..", "..")

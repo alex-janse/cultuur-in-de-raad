@@ -189,6 +189,13 @@ Tests draaien (zonder netwerk):
 Rscript -e "testthat::test_dir('tests/testthat')"
 ```
 
+Posit Connect Cloud publiceert alleen wat in `manifest.json` staat. Maak dat
+opnieuw na nieuwe bestanden in `R/` of nieuwe pakketten:
+
+```r
+rsconnect::writeManifest(appFiles = c("app.R", list.files("R", full.names = TRUE)))
+```
+
 ## Projectstructuur
 
 ```
