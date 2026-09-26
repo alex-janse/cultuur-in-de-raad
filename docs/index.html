@@ -5,44 +5,48 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cultuur in de raad</title>
   <meta name="description" content="Dashboard dat live Nederlandse raadsdocumenten doorzoekt op kunst- en cultuurthema's en de aandacht naast het cultuurbudget van gemeenten zet.">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700&family=Heebo:wght@400;500;700&display=swap">
   <style>
+    /* Zelfde kleuren en lettertypen als het dashboard */
     :root {
-      --bg: #fbfaf9;
-      --tekst: #1f1d1d;
-      --zacht: #5c5657;
-      --accent: #a3276f;
-      --accent-zacht: #f7e3ee;
+      --bg: #fafafa;
+      --tekst: #272727;
+      --zacht: #5a5a5a;
+      --accent: #5c1a82;
+      --accent-zacht: #efe6f5;
       --kaart: #ffffff;
-      --rand: #e8e2e4;
+      --rand: #e4e0e8;
       --max: 1040px;
     }
     @media (prefers-color-scheme: dark) {
       :root:not([data-theme="light"]) {
-        --bg: #151314;
-        --tekst: #efeaec;
-        --zacht: #b3a9ad;
-        --accent: #e577b5;
-        --accent-zacht: #3a1f2e;
-        --kaart: #1f1c1e;
-        --rand: #342e31;
+        --bg: #141216;
+        --tekst: #eeebf0;
+        --zacht: #b0a9b5;
+        --accent: #c9a3e0;
+        --accent-zacht: #2e2138;
+        --kaart: #1e1b21;
+        --rand: #342e39;
       }
     }
     :root[data-theme="dark"] {
-      --bg: #151314;
-      --tekst: #efeaec;
-      --zacht: #b3a9ad;
-      --accent: #e577b5;
-      --accent-zacht: #3a1f2e;
-      --kaart: #1f1c1e;
-      --rand: #342e31;
+      --bg: #141216;
+      --tekst: #eeebf0;
+      --zacht: #b0a9b5;
+      --accent: #c9a3e0;
+      --accent-zacht: #2e2138;
+      --kaart: #1e1b21;
+      --rand: #342e39;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       background: var(--bg);
       color: var(--tekst);
-      font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      font: 17px/1.6 Heebo, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     }
+    h1, h2, h3, .label, .knop, .cijfer { font-family: Barlow, system-ui, sans-serif; }
     main, header, footer { max-width: var(--max); margin: 0 auto; padding: 0 16px; }
     header { padding-top: 56px; padding-bottom: 24px; }
     .label {
@@ -66,6 +70,7 @@
     }
     figcaption { font-size: 14px; color: var(--zacht); margin-top: 8px; }
     .raster { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+    .raster.vier { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
     .blok {
       background: var(--kaart); border: 1px solid var(--rand); border-radius: 10px;
       padding: 16px 18px;
@@ -107,15 +112,19 @@
 
   <main>
     <figure>
-      <img src="img/kaart.png" alt="Kaart van Nederland met gemeenten ingekleurd naar het aantal raadsdocumenten over cultuurthema's per 1.000 documenten, met daaronder een ranking.">
-      <figcaption>Aandacht voor amateurkunst, cultuurbeoefening en talentontwikkeling per 1.000 raadsdocumenten, 2020–2026.</figcaption>
+      <img src="img/kaart.png" alt="Dashboard met links de zoekinstellingen, een kaart van Nederland met gemeenten ingekleurd naar het aantal raadsdocumenten over cultuurthema's per 1.000 documenten, en daaronder een sorteerbare ranking met bandbreedte.">
+      <figcaption>Aandacht voor amateurkunst, cultuurbeoefening en talentontwikkeling per 1.000 raadsdocumenten, 2020–2026, met een 95%-bandbreedte per gemeente.</figcaption>
     </figure>
 
     <h2>Wat kun je ermee?</h2>
     <div class="raster">
       <div class="blok">
         <h3>Kaart en ranking</h3>
-        <p>Alle gemeenten ingekleurd: per 1.000 raadsdocumenten, per 100.000 inwoners of absoluut.</p>
+        <p>Alle gemeenten ingekleurd en gerangschikt: per 1.000 raadsdocumenten, per 100.000 inwoners of absoluut. Sorteerbaar en doorzoekbaar.</p>
+      </div>
+      <div class="blok">
+        <h3>Vergelijkbare gemeenten</h3>
+        <p>De rang binnen de eigen grootteklasse, zodat een grote stad wordt vergeleken met andere grote steden.</p>
       </div>
       <div class="blok">
         <h3>Trend en vergelijken</h3>
@@ -123,32 +132,40 @@
       </div>
       <div class="blok">
         <h3>Gemeenteprofiel</h3>
-        <p>Kerncijfers, cultuurlasten 2023–2026 en de zinnen waarin de termen voorkomen.</p>
+        <p>Kerncijfers, een samenvatting in gewone taal, cultuurlasten 2023–2026 en de zinnen waarin de termen voorkomen.</p>
       </div>
       <div class="blok">
         <h3>Aandacht vs. budget</h3>
         <p>Welke gemeenten praten veel over cultuur maar geven er weinig aan uit, en omgekeerd?</p>
       </div>
+      <div class="blok">
+        <h3>Uitleg en export</h3>
+        <p>De methode in gewone taal, CSV- en PNG-export en een deelbare link die de zoekopdracht bewaart.</p>
+      </div>
     </div>
 
     <figure>
-      <img src="img/profiel.png" alt="Gemeenteprofiel van Tilburg met kerncijfers, een trendlijn naast Nederland, cultuurlasten per inwoner naast de mediaan, en de nieuwste raadsdocumenten met gemarkeerde zinnen.">
-      <figcaption>Gemeenteprofiel: kerncijfers, trend, budget en de nieuwste vermeldingen met gemarkeerde zinnen.</figcaption>
+      <img src="img/profiel.png" alt="Gemeenteprofiel van Tilburg met kerncijfers, een korte samenvatting, een trendlijn naast Nederland, cultuurlasten per inwoner naast de mediaan, en de nieuwste raadsdocumenten met gemarkeerde zinnen.">
+      <figcaption>Gemeenteprofiel: kerncijfers, samenvatting, trend, budget en de nieuwste vermeldingen met gemarkeerde zinnen.</figcaption>
     </figure>
 
     <h2>Eerlijker tellen</h2>
-    <div class="raster">
+    <div class="raster vier">
       <div class="blok">
-        <div class="cijfer">±20%</div>
-        <p>van de treffers is dezelfde bijlage bij meerdere agendapunten. Die worden samengevoegd.</p>
+        <div class="cijfer">~15%</div>
+        <p>van de treffers is dezelfde bijlage bij meerdere agendapunten. Die worden per gemeente samengevoegd, in de treffers én in de noemer.</p>
       </div>
       <div class="blok">
         <div class="cijfer">2/3</div>
         <p>van de treffers voor <em>talentontwikkeling</em> gaat niet over cultuur. Een contextfilter houdt alleen vermeldingen dicht bij cultuurwoorden over.</p>
       </div>
       <div class="blok">
+        <div class="cijfer">95%</div>
+        <p>bandbreedte (exact Poisson) bij elke waarde. Gemeenten met minder dan 10 treffers krijgen geen rang: hun plek is vooral toeval.</p>
+      </div>
+      <div class="blok">
         <div class="cijfer">per jaar</div>
-        <p>wordt gedeeld door het aantal documenten in dat jaar, zodat groei van het archief niet als groei van aandacht telt.</p>
+        <p>tellen alleen de jaren met archief mee, zodat gemeenten met een later begonnen of onvolledig archief niet benadeeld worden.</p>
       </div>
     </div>
 
@@ -162,11 +179,29 @@
       <figcaption>Aandacht in de raad naast de cultuurlasten per inwoner (jaarrekening 2024).</figcaption>
     </figure>
 
+    <h2>Onder de motorkap</h2>
+    <div class="raster">
+      <div class="blok">
+        <h3>Niet-blokkerend zoeken</h3>
+        <p>Live zoekvragen aan de Elasticsearch-API lopen asynchroon (<code>ExtendedTask</code> + <code>mirai</code>), zodat andere bezoekers door kunnen werken.</p>
+      </div>
+      <div class="blok">
+        <h3>Nachtelijke voorberekening</h3>
+        <p>Een GitHub Action rekent de standaardvragen vooraf uit. De app controleert die data op versie en leeftijd en valt anders terug op live ophalen.</p>
+      </div>
+      <div class="blok">
+        <h3>Getest en veilig</h3>
+        <p>Tests zonder netwerk in CI bij elke push, ge-escapete brontekst, CSV-export beschermd tegen formule-injectie en Actions vastgezet op een commit-SHA.</p>
+      </div>
+    </div>
+
     <h2 id="starten">Zelf starten</h2>
     <p>Je hebt R 4.4 of nieuwer nodig. Installeer de pakketten en start de app vanuit de map van het project:</p>
-<pre><code>install.packages(c("shiny", "httr2", "jsonlite", "dplyr", "tidyr", "leaflet",
-                   "ggplot2", "ggrepel", "cbsodataR", "sf", "cachem"))
+<pre><code>install.packages(c("shiny", "bslib", "httr2", "jsonlite", "dplyr", "tidyr",
+                   "leaflet", "ggplot2", "ggrepel", "DT", "cbsodataR", "sf",
+                   "cachem", "mirai"))
 shiny::runApp()</code></pre>
+    <p>Meer over de methode, de tests en de opzet staat in de <a href="https://github.com/alex-janse/cultuur-in-de-raad#readme">README</a>.</p>
 
     <h2>Kanttekeningen</h2>
     <ul>
