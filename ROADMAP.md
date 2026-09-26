@@ -1,8 +1,14 @@
 # Roadmap: Cultuur in de raad
 
-## In het kort
-Het dashboard werkt en staat online. Een kritische code-review vond **44 punten**.
-De belangrijkste:
+## Stand van zaken
+- **Afgerond**: fase 0 (stabiliteit), 1 (cijfers), 2 (veiligheid), het grootste deel
+  van fase 3 (gebruiksgemak) en 4.3 (vergelijkbare gemeenten).
+- **Open**: de beoordeling van de validatie-steekproef (1.7), de telefoonweergave
+  (3.6) en de rest van fase 4 en 5.
+
+## Aanleiding
+Na de eerste online versie vond een kritische code-review **44 punten**.
+De belangrijkste (inmiddels opgelost in fase 0–2):
 
 1. **Eén bezoeker kan de app voor iedereen laten vastlopen.** Een zoekvraag blokkeert
    het hele R-proces, en bij een API-blokkade (HTTP 429) kan dat minutenlang duren.
@@ -17,10 +23,7 @@ De belangrijkste:
    controle.
 
 De roadmap loopt in zes fasen, van "eerst repareren" naar "uitbreiden". Elke fase
-wordt een eigen reeks commits die los online kan.
-
-Het actiepunt "Open State Foundation mailen" staat in CLAUDE.md. Het
-privacypunt uit fase 2 hoort in die mail thuis.
+is een eigen pull request die los online kan.
 
 ---
 
@@ -66,7 +69,7 @@ per term bekend (na het invullen door een vakinhoudelijk persoon).
 | 2.3 | **Data-tak als JSON/Parquet** in plaats van RDS (geen uitvoerbare R-objecten van internet), of in elk geval de klassen controleren. Actions vastzetten op een commit-SHA. | `R/voorberekend.R`, workflows |
 | 2.4 | **CSV-injectie**: titels die met `= + - @` beginnen escapen, en `veilige_link` ook in de documentenexport. | `R/export.R`, `app.R` |
 
-## Fase 3: Begrijpelijk en toegankelijk (breed publiek)
+## Fase 3: Begrijpelijk en toegankelijk (breed publiek) — grotendeels afgerond (PR #4, #5); 3.6 open
 | # | Wat | Waar |
 |---|---|---|
 | 3.1 | **Direct resultaat bij openen**: de standaardvraag laadt automatisch (voorberekend). De knop heet "Zoeken". `useBusyIndicators()`. | `app.R` |
@@ -76,7 +79,7 @@ per term bekend (na het invullen door een vakinhoudelijk persoon).
 | 3.5 | **Kleine UX-bugs**: eigen termen blijven zichtbaar na een gedeelde link; de link bewaart het getoonde resultaat; de themakeuze reset; "€–" bij ontbrekend budget; dubbele trendberekening (`bindEvent`). | `app.R` |
 | 3.6 | **Mobiele weergave** controleren en verbeteren (smalle zijbalk, kaarthoogte). | `app.R` CSS |
 
-## Fase 4: Verdieping (sector en beleid)
+## Fase 4: Verdieping (sector en beleid) — 4.3 afgerond (PR #5)
 | # | Wat |
 |---|---|
 | 4.1 | **Documentsoort** (motie, amendement, raadsvoorstel, besluit, bijlage, verslag) uit titelwoorden, als filter en als uitsplitsing. |
@@ -99,7 +102,7 @@ per term bekend (na het invullen door een vakinhoudelijk persoon).
 ## Werkwijze en verificatie
 - **Per fase een eigen branch en pull request**, zodat CI (0.7) meekijkt; na akkoord mergen,
   waarna Connect Cloud automatisch publiceert.
-- **Zuinig met de API** (CLAUDE.md): tests zonder netwerk met fixtures, en hooguit één
+- **Zuinig met de API**: tests zonder netwerk met fixtures, en hooguit één
   handmatige live-run per fase.
 - **Per fase**:
   - testthat;
@@ -109,6 +112,5 @@ per term bekend (na het invullen door een vakinhoudelijk persoon).
 - **Na fase 0 en 1** worden de README en de uitleg bijgewerkt met de nieuwe methode.
 
 ## Voorgestelde volgorde
-Fase 0 → 1 → 2 → 3 → 4 → 5. Fase 0 en 1 zijn nodig voordat je het dashboard breed
-deelt. Fase 2 hoort bij de mail aan Open State. Daarna kun je 3–5 naar behoefte
-kiezen.
+Fase 0 → 1 → 2 → 3 → 4 → 5. Fase 0 en 1 waren nodig voordat het dashboard breed
+gedeeld kon worden. Daarna kunnen 3–5 naar behoefte gekozen worden.
