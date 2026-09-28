@@ -72,8 +72,15 @@ if (ASYNC) {
   })
 }
 
-# Live opgehaalde resultaten, gedeeld door alle bezoekers van dit proces
+# Live opgehaalde resultaten, gedeeld door alle bezoekers van dit proces.
+# Alleen volledige: bij een tijdelijke storing (archiefdelen, CBS) moet een
+# volgende bezoeker het opnieuw kunnen proberen.
 resultaat_cache <- cachem::cache_mem(max_age = 3600)
+bewaar_resultaat <- function(res) {
+  if (length(res$meldingen) == 0 && isTRUE(res$inwoners_ok)) {
+    resultaat_cache$set(zoek_sleutel(res$termen, res$jaren, res$opties), res)
+  }
+}
 
 # --- UI ----------------------------------------------------------------------
 
@@ -257,6 +264,17 @@ server <- function(input, output, session) {
     updateSelectizeInput(session, "termen", selected = THEMASETS[[input$thema]])
   })
 
+  # Keuzes kunnen uit een link of een zelfgemaakt verzoek komen: alleen
+  # bekende waarden doorlaten. Een onbekende budgetkeuze zou anders een
+  # volledige CBS-download per verzonnen waarde veroorzaken.
+  maatstaf <- reactive({
+    if (isTRUE(input$maatstaf %in% MAATSTAVEN)) input$maatstaf else MAATSTAVEN[[1]]
+  })
+  budget_keuze <- reactive({
+    req(isTRUE(input$budget_keuze %in% IV3_KEUZES))
+    input$budget_keuze
+  })
+
   zoekopties <- reactive(list(
     context = isTRUE(input$opt_context),
     woordvormen = isTRUE(input$opt_woordvormen),
@@ -326,7 +344,7 @@ server <- function(input, output, session) {
     status <- zoek_taak$status()
     if (status == "success") {
       res <- zoek_taak$result()
-      resultaat_cache$set(zoek_sleutel(res$termen, res$jaren, res$opties), res)
+      bewaar_resultaat(res)
       sel <- wachtende_selectie()
       verwerk_resultaat(res, sel$trend, sel$profiel)
       wachtende_selectie(list())
@@ -391,7 +409,7 @@ server <- function(input, output, session) {
     }
     res$bron <- "live"
     res$meldingen <- meldingen
-    resultaat_cache$set(sleutel, res)
+    bewaar_resultaat(res)
     verwerk_resultaat(res, trend_selectie, profiel_selectie)
     invisible(TRUE)
   }
@@ -426,8 +444,20 @@ server <- function(input, output, session) {
   onRestore(function(state) wordt_hersteld <<- TRUE)
   onRestored(function(state) {
     zoek <- state$values$zoek
-    if (is.null(zoek)) return()
-    termen <- unlist(zoek$termen)
+    # De link kan zijn aangepast: termen en jaren net zo controleren als invoer
+    termen <- schoon_termen(unlist(zoek$termen))
+    # Een link zonder (bruikbare) zoekvraag, bv. gemaakt voordat er een
+    # resultaat was: dan de standaardzoekvraag, anders blijft de app leeg
+    if (length(termen) == 0) {
+      doe_ophalen(STANDAARD_TERMEN, standaard_periode(), STANDAARD_OPTIES)
+      return()
+    }
+    jaren <- suppressWarnings(as.integer(unlist(zoek$jaren)))
+    jaren <- if (length(jaren) == 2 && !anyNA(jaren)) {
+      sort(pmin(pmax(jaren, EERSTE_JAAR), huidig_jaar()))
+    } else {
+      standaard_periode()
+    }
     # Eigen termen staan niet in de keuzelijst: toevoegen, anders verdwijnen
     # ze uit het invoerveld
     eigen <- setdiff(termen, unlist(TERMEN))
@@ -436,9 +466,15 @@ server <- function(input, output, session) {
       choices = c(TERMEN, if (length(eigen) > 0) list("Eigen termen" = eigen)),
       selected = termen
     )
-    updateSliderInput(session, "jaren", value = unlist(zoek$jaren))
-    opties <- lapply(zoek$opties, isTRUE)
-    doe_ophalen(termen, unlist(zoek$jaren), opties,
+    updateSliderInput(session, "jaren", value = jaren)
+    opties <- lapply(zoek$opties[c("context", "woordvormen", "dedup")], isTRUE)
+    names(opties) <- c("context", "woordvormen", "dedup")
+    # De vinkjes horen bij het getoonde resultaat, niet bij hun stand op het
+    # moment dat de link werd gemaakt
+    updateCheckboxInput(session, "opt_context", value = opties$context)
+    updateCheckboxInput(session, "opt_woordvormen", value = opties$woordvormen)
+    updateCheckboxInput(session, "opt_dedup", value = opties$dedup)
+    doe_ophalen(termen, jaren, opties,
                 trend_selectie = unlist(state$values$trend),
                 profiel_selectie = unlist(state$values$profiel))
   })
@@ -513,7 +549,7 @@ server <- function(input, output, session) {
   gerangschikt <- reactive({
     res <- resultaat()
     req(res)
-    rangschik(res$per_gemeente, input$maatstaf, input$klasse)
+    rangschik(res$per_gemeente, maatstaf(), input$klasse)
   })
 
   # --- Kaart ---
@@ -534,11 +570,11 @@ server <- function(input, output, session) {
     req(grenzen)
     res <- resultaat()
     req(res)
-    kaart_df <- maak_kaart_df(grenzen, res$per_gemeente, input$maatstaf)
+    kaart_df <- maak_kaart_df(grenzen, res$per_gemeente, maatstaf())
     leafletProxy("kaart") |>
       clearShapes() |>
       clearControls() |>
-      voeg_kaartlagen_toe(kaart_df, input$maatstaf)
+      voeg_kaartlagen_toe(kaart_df, maatstaf())
   })
 
   # Zoekvak 'Ga naar gemeente': direct naar het profiel
@@ -589,9 +625,9 @@ server <- function(input, output, session) {
   output$tabel <- DT::renderDT({
     df <- ranking_tabel()
     shiny::validate(need(nrow(df) > 0, "Geen resultaten."))
-    cijfers <- if (input$maatstaf == "absoluut") 0 else 1
+    cijfers <- if (maatstaf() == "absoluut") 0 else 1
     termen <- resultaat()$termen
-    eenheid <- EENHEDEN[[input$maatstaf]]
+    eenheid <- EENHEDEN[[maatstaf()]]
     tabel <- df |>
       transmute(
         Rang, Gemeente,
@@ -650,7 +686,7 @@ server <- function(input, output, session) {
                          "Geen treffers in deze periode."))
     df$gebied <- factor(df$gebied, levels = unique(df$gebied))
     plot_trend(df, res$termen, res$jaren,
-               relatief = input$maatstaf != "absoluut",
+               relatief = maatstaf() != "absoluut",
                titel = sprintf("Aandacht voor %s",
                                paste(res$termen, collapse = ", ")))
   })
@@ -674,14 +710,21 @@ server <- function(input, output, session) {
 
   # Eén keer per proces (gedeeld door alle bezoekers); normaal uit de
   # nachtelijke voorberekening, anders live bij het CBS. Mislukt het, dan
-  # wordt het een minuut niet opnieuw geprobeerd.
-  lasten_voor <- function(keuze) {
+  # wordt het een kwartier niet opnieuw geprobeerd (het ophalen blokkeert
+  # het proces), en krijgt deze bezoeker de melding per keuze maar één keer.
+  budget_gemeld <- character()
+  lasten_voor <- function(keuze, stil = FALSE) {
+    force(keuze)  # een req() in de keuze niet als CBS-fout afhandelen
     tryCatch(
-      per_proces(paste0("iv3_", keuze), \() haal_cultuurlasten(keuze)),
+      per_proces(paste0("iv3_", keuze), \() haal_cultuurlasten(keuze),
+                 fout_geldig = 15 * 60),
       error = function(e) {
-        showNotification(paste("CBS-budgetdata ophalen mislukt:",
-                               conditionMessage(e)),
-                         type = "error", duration = 10)
+        if (!stil && !keuze %in% budget_gemeld) {
+          budget_gemeld <<- c(budget_gemeld, keuze)
+          showNotification(paste("CBS-budgetdata ophalen mislukt:",
+                                 conditionMessage(e)),
+                           type = "error", duration = 10)
+        }
         NULL
       }
     )
@@ -766,7 +809,7 @@ server <- function(input, output, session) {
     df$gebied <- factor(df$gebied, levels = unique(df$gebied))
     # Alleen het totaal van de gekozen termen: past beter in de halve breedte
     plot_trend(df, res$termen, res$jaren,
-               relatief = input$maatstaf != "absoluut",
+               relatief = maatstaf() != "absoluut",
                titel = "Aandacht door de jaren", alleen_totaal = TRUE)
   }, alt = reactive(sprintf(
     "Lijngrafiek: aandacht per jaar in %s naast heel Nederland.",
@@ -775,7 +818,9 @@ server <- function(input, output, session) {
   output$profiel_budget <- renderPlot({
     rij <- profiel_rij()
     req(input$tabs == "profiel")
-    lasten <- bind_rows(lapply(IV3_KEUZES, lasten_voor))
+    # Een keuze zonder data (bv. een begroting die CBS nog niet heeft) stil
+    # overslaan; de grafiek toont dan de andere jaren
+    lasten <- bind_rows(lapply(IV3_KEUZES, lasten_voor, stil = TRUE))
     shiny::validate(need(nrow(lasten) > 0, "Budgetgegevens niet beschikbaar."),
                     need(!is.na(rij$gemeentecode), "Geen CBS-gemeentecode."))
     plot_budget_trend(lasten, rij$gemeentecode, rij$gemeente)
@@ -783,17 +828,65 @@ server <- function(input, output, session) {
     "Staafdiagram: lasten voor cultuur per inwoner in %s naast de mediaan van alle gemeenten, 2023 tot en met 2026.",
     profiel_rij()$gemeente)))
 
-  output$profiel_fragmenten <- renderUI({
+  # Fragmenten: een verzoek aan de API per gemeente. Op de achtergrond (net
+  # als live zoeken), zodat een trage API de app niet voor iedereen
+  # stillegt, en alleen als het profiel echt bekeken wordt.
+  frag_taak <- ExtendedTask$new(function(key, ruw, termen, jaren, opties) {
+    # Fouten hier al afvangen, zodat ze bij de juiste gemeente horen
+    mirai::mirai(
+      tryCatch(list(key = key, frag = haal_fragmenten(ruw, termen, jaren, opties)),
+               error = function(e) list(key = key, fout = conditionMessage(e))),
+      key = key, ruw = ruw, termen = termen, jaren = jaren, opties = opties)
+  })
+  frag_uitkomst <- reactiveVal(NULL)
+
+  observe({
+    req(input$tabs == "profiel")
     rij <- profiel_rij()
     res <- resultaat()
-    frag <- tryCatch(
-      haal_fragmenten(rij$ruw[[1]], res$termen, res$jaren, res$opties),
-      error = function(e) {
-        tags$p(class = "text-danger",
-               paste("Fragmenten ophalen mislukt:", conditionMessage(e)))
-      }
-    )
-    if (inherits(frag, "shiny.tag")) return(frag)
+    if (!is.null(blokkade_tot())) {
+      frag_uitkomst(list(key = rij$key,
+                         fout = tryCatch(blokkade_fout(), error = conditionMessage)))
+      return()
+    }
+    if (ASYNC) {
+      frag_uitkomst(list(key = rij$key, bezig = TRUE))
+      frag_taak$invoke(rij$key, rij$ruw[[1]], res$termen, res$jaren, res$opties)
+    } else {
+      frag_uitkomst(tryCatch(
+        list(key = rij$key,
+             frag = haal_fragmenten(rij$ruw[[1]], res$termen, res$jaren, res$opties)),
+        error = function(e) list(key = rij$key, fout = conditionMessage(e))))
+    }
+  })
+
+  observeEvent(frag_taak$status(), {
+    status <- frag_taak$status()
+    uitkomst <- if (status == "success") {
+      frag_taak$result()
+    } else if (status == "error") {
+      # Alleen als het achtergrondproces zelf faalt
+      list(key = NA, fout = tryCatch({ frag_taak$result(); "" },
+                                     error = function(e) conditionMessage(e)))
+    }
+    req(uitkomst)
+    # De blokkade van het achtergrondproces ook hier onthouden
+    if (grepl("429", uitkomst$fout %||% "")) zet_blokkade()
+    frag_uitkomst(uitkomst)
+  })
+
+  output$profiel_fragmenten <- renderUI({
+    rij <- profiel_rij()
+    uitkomst <- frag_uitkomst()
+    if (!is.null(uitkomst$fout) && (is.na(uitkomst$key) || identical(uitkomst$key, rij$key))) {
+      return(tags$p(class = "text-danger",
+                    paste("Fragmenten ophalen mislukt:", uitkomst$fout)))
+    }
+    # Een uitkomst van een eerder gekozen gemeente niet tonen
+    if (is.null(uitkomst) || !identical(uitkomst$key, rij$key) || isTRUE(uitkomst$bezig)) {
+      return(helpText("Vermeldingen ophalen…"))
+    }
+    frag <- uitkomst$frag
     if (nrow(frag) == 0) return(helpText("Geen vermeldingen gevonden."))
     tagList(lapply(seq_len(nrow(frag)), function(i) {
       f <- frag[i, ]
@@ -815,10 +908,10 @@ server <- function(input, output, session) {
   # --- Aandacht vs. budget ---
 
   aandacht_kolom <- reactive({
-    if (input$maatstaf == "inwoners") "per_100k" else "per_1000"
+    if (maatstaf() == "inwoners") "per_100k" else "per_1000"
   })
   aandacht_label <- reactive({
-    if (input$maatstaf == "inwoners") {
+    if (maatstaf() == "inwoners") {
       "Aandacht: documenten per 100.000 inwoners per jaar"
     } else {
       "Aandacht: documenten per 1.000 raadsdocumenten"
@@ -828,7 +921,7 @@ server <- function(input, output, session) {
   budget_df <- reactive({
     res <- resultaat()
     shiny::validate(need(res, "Haal eerst live data op."))
-    lasten <- lasten_voor(input$budget_keuze)
+    lasten <- lasten_voor(budget_keuze())
     shiny::validate(need(lasten, "Budgetdata niet beschikbaar."))
     df <- maak_budget_df(res$per_gemeente, lasten, aandacht_kolom())
     shiny::validate(need(nrow(df) >= 5, "Te weinig gemeenten om te vergelijken."))
@@ -837,7 +930,7 @@ server <- function(input, output, session) {
 
   budget_plot <- reactive({
     plot_budget(budget_df(), resultaat()$jaren, aandacht_label(),
-                names(IV3_KEUZES)[IV3_KEUZES == input$budget_keuze])
+                names(IV3_KEUZES)[IV3_KEUZES == budget_keuze()])
   })
 
   output$budget_plot <- renderPlot(budget_plot(), alt = reactive(sprintf(paste(
@@ -846,10 +939,10 @@ server <- function(input, output, session) {
     "toont de grootste verschillen."), nrow(budget_df()))))
 
   output$budget_bron <- renderUI({
-    req(input$budget_keuze)
+    req(budget_keuze())
     label <- paste("Bron: CBS Iv3,",
-                   tolower(names(IV3_KEUZES)[IV3_KEUZES == input$budget_keuze]))
-    regel <- bron_regel(lees_voorberekend("bronversies.rds"), input$budget_keuze, label)
+                   tolower(names(IV3_KEUZES)[IV3_KEUZES == budget_keuze()]))
+    regel <- bron_regel(lees_voorberekend("bronversies.rds"), budget_keuze(), label)
     if (!is.null(regel)) helpText(regel)
   })
 
