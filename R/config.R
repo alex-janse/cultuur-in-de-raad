@@ -234,10 +234,16 @@ ONVOLLEDIGE_FUSIES <- c(
 
 # "Gemeenten <jaar> onbewerkte Iv3-data" staan niet in de StatLine-catalogus
 # maar op dataderden.cbs.nl. Bedragen in 1.000 euro ("1e plaatsing").
+# Verslagsoort: X005 = jaarrekening, X000 = (primitieve) begroting.
+# De nachtelijke run zoekt de tabellen zelf op in de catalogus en kiest per
+# soort de IV3_AANTAL_JAREN nieuwste jaren waarvoor minstens
+# IV3_MIN_GEMEENTEN gemeenten cijfers hebben (ontdek_iv3_keuzes()). De app
+# gebruikt die lijst (iv3_keuzes()); de lijsten hieronder zijn alleen de
+# reserve als die er niet is.
+IV3_AANTAL_JAREN <- 2
+IV3_MIN_GEMEENTEN <- 170   # ongeveer de helft van de gemeenten
 IV3_TABELLEN <- c(`2023` = "45063NED", `2024` = "45067NED",
                   `2025` = "45071NED", `2026` = "45078NED")
-IV3_JAAR <- 2024                                  # meest recente jaarrekening
-# Verslagsoort: X005 = jaarrekening, X000 = (primitieve) begroting
 IV3_KEUZES <- c("Jaarrekening 2024" = "2024_rekening",
                 "Jaarrekening 2023" = "2023_rekening",
                 "Begroting 2026" = "2026_begroting",

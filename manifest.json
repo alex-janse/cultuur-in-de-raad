@@ -2682,7 +2682,7 @@
   },
   "files": {
     "app.R": {
-      "checksum": "ee2e013c1f04e4f67ca40398c2195b2e"
+      "checksum": "ccb570d352ee6c129a5f030d8e559cd4"
     },
     "R/00_pakketten.R": {
       "checksum": "8cbd0326cdeca71d715fdbac31aa17ab"
@@ -2694,10 +2694,10 @@
       "checksum": "1c12303b6854ec1e7419b8c470626218"
     },
     "R/cbs.R": {
-      "checksum": "aa442878af9790e7b3202f00599f31e4"
+      "checksum": "46d6f05287fa3a3a411d8a1bb6e0ea88"
     },
     "R/config.R": {
-      "checksum": "c79b571a4e94217f498add5cec15dabe"
+      "checksum": "2d8cd1d3c7c45a80875797cb755c5dcb"
     },
     "R/export.R": {
       "checksum": "2f4d14fa8953d8afd0372618e00fc01c"
@@ -2709,7 +2709,7 @@
       "checksum": "a27587d262a6912e5f24acbdf5c55638"
     },
     "R/nachtrun.R": {
-      "checksum": "fdf7a854de63a209ff0f615402671a7c"
+      "checksum": "e6efcbe96f57567b7bafcf9ca8dc35ea"
     },
     "R/namen.R": {
       "checksum": "8a65024cb67e62afd6647b7477e9ce51"
@@ -2724,7 +2724,7 @@
       "checksum": "2f0d3784c40eaf9b3d9d7d65a239a532"
     },
     "R/voorberekend.R": {
-      "checksum": "108065995932ccd6a0db0fc924d70b4d"
+      "checksum": "cf610c4dc58ef2afe79cef60b0ab49cb"
     }
   },
   "users": null

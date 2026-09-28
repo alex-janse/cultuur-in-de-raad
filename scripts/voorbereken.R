@@ -42,10 +42,25 @@ werk_bij(staat, "inwoners", "cbs_inwoners.rds", \() cbs_versie("inwoners"),
 # zouden ze zonder gemeentecodes (kaart, per inwoner) worden gepubliceerd
 if (!inwoners_naar_cache(uitvoer)) message("  geen CBS-inwoners beschikbaar")
 
-for (keuze in IV3_KEUZES) {
-  werk_bij(staat, keuze, sprintf("iv3_%s.rds", keuze), \() cbs_versie(keuze),
-           \(nieuw) haal_cultuurlasten(keuze))
+# Welke budgetjaren er zijn: uit de CBS-catalogus (per soort de nieuwste jaren
+# met cijfers van genoeg gemeenten). Lukt dat niet, dan de lijst van de vorige
+# run, en anders de reservelijst uit R/config.R.
+keuzes_pad <- file.path(uitvoer, "iv3_keuzes.rds")
+keuzes <- probeer("Iv3-keuzes (CBS-catalogus)", ontdek_iv3_keuzes, pogingen = 2)
+if (is.null(keuzes)) {
+  staat$waarschuwingen <- c(staat$waarschuwingen, "Iv3-keuzes")
+  keuzes <- if (file.exists(keuzes_pad)) readRDS(keuzes_pad) else iv3_keuzes_tabel()
 }
+message("Budgetkeuzes: ", paste(keuzes$label, collapse = ", "))
+for (i in seq_len(nrow(keuzes))) {
+  k <- keuzes[i, ]
+  werk_bij(staat, k$keuze, sprintf("iv3_%s.rds", k$keuze),
+           \() cbs_versie(k$keuze, k$tabel),
+           \(nieuw) haal_cultuurlasten(k$keuze, k$tabel))
+}
+# De app biedt alleen keuzes aan waarvan de cijfers er (goedgekeurd) zijn
+beschikbaar <- keuzes[file.exists(file.path(uitvoer, sprintf("iv3_%s.rds", keuzes$keuze))), ]
+saveRDS(beschikbaar, keuzes_pad)
 
 # Precies het jaar downloaden dat bij de controle is gevonden
 werk_bij(staat, "grenzen", "gemeentegrenzen.rds",
@@ -58,7 +73,7 @@ werk_bij(staat, "grenzen", "gemeentegrenzen.rds",
 
 # Alleen versies van onderdelen die nog bestaan (bv. niet een oud Iv3-jaar)
 versies <- staat$versies
-versies <- versies[versies$onderdeel %in% c("inwoners", IV3_KEUZES, "grenzen"), ]
+versies <- versies[versies$onderdeel %in% c("inwoners", keuzes$keuze, "grenzen"), ]
 saveRDS(versies, file.path(uitvoer, "bronversies.rds"))
 
 
@@ -190,7 +205,7 @@ if (length(overzicht) > 0) {
   utils::write.csv(nieuw, vorig_pad, row.names = FALSE)
   # Opruimen: zoekresultaten die niet (meer) in het overzicht staan, bv. na
   # een andere methode of periode, en Iv3-bestanden van oude keuzes
-  oud <- op_te_ruimen(list.files(uitvoer), nieuw$sleutel)
+  oud <- op_te_ruimen(list.files(uitvoer), nieuw$sleutel, keuzes = beschikbaar$keuze)
   # Bij een overgang naar een nieuwe versie van de app (OUDE_BEWAREN=true,
   # handmatige run): de oude zoekresultaten laten staan, zodat de huidige app
   # blijft werken tot de nieuwe online staat. De volgende run ruimt ze op.
@@ -224,7 +239,7 @@ if (length(mislukt) > 0) {
 } else if (file.exists(mislukt_pad)) {
   invisible(file.remove(mislukt_pad))
 }
-aantal_onderdelen <- 1 + length(IV3_KEUZES) + 1 + length(voorberekende_sets())
+aantal_onderdelen <- 1 + nrow(keuzes) + 1 + length(voorberekende_sets())
 if (length(mislukt) == aantal_onderdelen) {
   stop("Alles mislukt; niets bijgewerkt.")
 }

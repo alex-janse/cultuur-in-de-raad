@@ -51,7 +51,8 @@ test_that("wachttijd wacht bij een blokkade tot die voorbij is", {
 
 test_that("op_te_ruimen: oude zoekresultaten en Iv3-keuzes", {
   bestanden <- c("zoek_a.rds", "zoek_b.rds", "iv3_2024_rekening.rds",
-                 "iv3_2019_rekening.rds", "cbs_inwoners.rds", "overzicht.csv")
+                 "iv3_2019_rekening.rds", "cbs_inwoners.rds", "overzicht.csv",
+                 "iv3_keuzes.rds")
   expect_setequal(op_te_ruimen(bestanden, "a", keuzes = "2024_rekening"),
                   c("zoek_b.rds", "iv3_2019_rekening.rds"))
 })

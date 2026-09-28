@@ -167,9 +167,10 @@ werk_bij <- function(staat, onderdeel, bestand, versie_fn, haal_fn) {
 
 # Bestanden in de uitvoermap die weg kunnen: zoekresultaten die niet in het
 # overzicht staan en Iv3-bestanden van keuzes die niet meer bestaan
-op_te_ruimen <- function(bestanden, sleutels, keuzes = IV3_KEUZES) {
+op_te_ruimen <- function(bestanden, sleutels, keuzes) {
   zoek <- grep("^zoek_.*[.]rds$", bestanden, value = TRUE)
-  iv3 <- grep("^iv3_.*[.]rds$", bestanden, value = TRUE)
+  # Alleen cijferbestanden (iv3_<jaar>_<soort>.rds), niet de lijst iv3_keuzes.rds
+  iv3 <- grep("^iv3_[0-9]{4}_[a-z]+[.]rds$", bestanden, value = TRUE)
   c(setdiff(zoek, sprintf("zoek_%s.rds", sleutels)),
     setdiff(iv3, sprintf("iv3_%s.rds", keuzes)))
 }
