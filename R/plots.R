@@ -70,13 +70,12 @@ plot_trend <- function(df, termen, jaren, relatief = TRUE, titel = NULL,
       title = titel, x = NULL, colour = NULL,
       y = if (relatief) "Documenten per 1.000 raadsdocumenten"
           else "Aantal documenten",
-      caption = paste(c(
-        uitleg,
-        if (met_lopend) {
+      caption = {
+        regels <- c(uitleg, if (met_lopend) {
           sprintf("Open punt en gestippelde lijn: %d is nog niet compleet.", jaar_nu)
-        }
-      ), collapse = "
-")
+        })
+        if (length(regels) > 0) paste(regels, collapse = "\n")
+      }
     ) +
     thema_dashboard()
 }
