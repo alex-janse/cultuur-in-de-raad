@@ -74,6 +74,14 @@ if (ASYNC) {
   })
 }
 
+# Bij het starten van het proces alle voorberekende bestanden tegelijk ophalen,
+# zodat de eerste bezoeker niet op downloads na elkaar wacht
+if (!VRIJ_ZOEKEN) haal_voorberekend_vooraf(voorberekende_bestanden())
+
+# Opgetelde periodeblokken, gedeeld door alle bezoekers van dit proces: wie
+# hetzelfde thema en dezelfde periode kiest, hoeft niet opnieuw op te tellen
+blok_cache <- cachem::cache_mem(max_age = 3600)
+
 # Live opgehaalde resultaten, gedeeld door alle bezoekers van dit proces.
 # Alleen volledige: bij een tijdelijke storing (archiefdelen, CBS) moet een
 # volgende bezoeker het opnieuw kunnen proberen.
@@ -541,10 +549,15 @@ server <- function(input, output, session) {
                         "Probeer het over een paar minuten opnieuw."))
         return()
       }
+      sleutel <- rlang::hash(list(thema_termen(), gekozen_blok(), volledig$berekend_op))
+      blok <- blok_cache$get(sleutel)
+      if (cachem::is.key_missing(blok)) {
+        blok <- blok_resultaat(volledig, blok_jaren(gekozen_blok()))
+        blok_cache$set(sleutel, blok)
+      }
       sel <- wachtende_selectie()
       wachtende_selectie(list())
-      verwerk_resultaat(blok_resultaat(volledig, blok_jaren(gekozen_blok())),
-                        sel$trend, sel$profiel)
+      verwerk_resultaat(blok, sel$trend, sel$profiel)
     })
   }
 
@@ -625,7 +638,8 @@ server <- function(input, output, session) {
   # melding komt één keer.
   grenzen_gemeld <- FALSE
   grenzen <- reactive({
-    tryCatch(per_proces("grenzen", haal_gemeentegrenzen, fout_geldig = 5 * 60),
+    tryCatch(per_proces("grenzen", \() rond_grenzen_af(haal_gemeentegrenzen()),
+                        fout_geldig = 5 * 60),
              error = function(e) {
       if (!grenzen_gemeld) {
         grenzen_gemeld <<- TRUE
