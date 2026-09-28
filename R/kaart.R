@@ -55,7 +55,8 @@ voeg_kaartlagen_toe <- function(kaart, kaart_df, maatstaf) {
              na.color = GEEN_DATA_KLEUR)
   } else {
     # Eén unieke waarde (of geen): een schaal van 0 tot die waarde
-    colorNumeric(PALET_KAART, domain = c(0, max(1, breaks)), na.color = GEEN_DATA_KLEUR)
+    colorNumeric(PALET_KAART, domain = c(0, max(1, breaks, na.rm = TRUE)),
+                 na.color = GEEN_DATA_KLEUR)
   }
   cijfers <- if (maatstaf == "absoluut") 0 else 1
   # Legenda in Nederlandse notatie (labelFormat kent geen decimale komma)
@@ -67,7 +68,7 @@ voeg_kaartlagen_toe <- function(kaart, kaart_df, maatstaf) {
     }
   }
 
-  kaart |>
+  kaart <- kaart |>
     addPolygons(
       data = kaart_df, layerId = ~gemeentecode,
       fillColor = ~pal(waarde), fillOpacity = 0.8,
@@ -75,11 +76,18 @@ voeg_kaartlagen_toe <- function(kaart, kaart_df, maatstaf) {
       label = lapply(kaart_df$label, htmltools::HTML),
       highlightOptions = highlightOptions(weight = 2, color = "#333",
                                           bringToFront = TRUE)
-    ) |>
-    addLegend("bottomright", pal = pal, values = kaart_df$waarde,
-              title = EENHEDEN[[maatstaf]], opacity = 0.8,
-              na.label = "geen gegevens",
-              labFormat = legenda_labels)
+    )
+  # Zonder enige waarde (bv. per inwoner zonder CBS-inwoners) is een
+  # kleurschaal betekenisloos: alleen 'geen gegevens'
+  if (all(is.na(kaart_df$waarde))) {
+    return(addLegend(kaart, "bottomright", colors = GEEN_DATA_KLEUR,
+                     labels = "geen gegevens", title = EENHEDEN[[maatstaf]],
+                     opacity = 0.8))
+  }
+  addLegend(kaart, "bottomright", pal = pal, values = kaart_df$waarde,
+            title = EENHEDEN[[maatstaf]], opacity = 0.8,
+            na.label = "geen gegevens",
+            labFormat = legenda_labels)
 }
 
 basiskaart <- function() {

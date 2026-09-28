@@ -55,3 +55,34 @@ test_that("verhaal_gemeente: vergelijking, klasse, budget en voorzichtigheid", {
 test_that("het tabblad Uitleg bouwt zonder fouten", {
   expect_s3_class(uitleg_ui(), "shiny.tag")
 })
+
+test_that("gelijke waarden krijgen dezelfde rang", {
+  pg <- pg_voorbeeld()
+  pg$per_1000 <- c(4, 3, 3, 9, 1)
+  r <- rangschik(pg, "relatief")
+  expect_equal(r$rang[r$key %in% c("b", "c")], c(2L, 2L))
+  expect_equal(r$rang[r$key == "e"], 4L)
+  expect_match(rang_tekst(r, "d"), sprintf("minder dan %d", MIN_TREFFERS_RANG))
+})
+
+geen_trend <- tibble(jaar = integer(), term = character(), n = numeric(),
+                     archief = numeric())
+
+test_that("het profielverhaal crasht niet als maar één gemeente een rang heeft", {
+  pg <- pg_voorbeeld()
+  pg$weinig_treffers <- c(FALSE, TRUE, TRUE, TRUE, TRUE)
+  z <- verhaal_gemeente(pg[1, ], pg, geen_trend, NULL)
+  expect_match(z[1], "te weinig om betrouwbaar")
+})
+
+test_that("het profielverhaal noemt de vergeleken gemeenten", {
+  pg <- pg_voorbeeld()
+  z <- verhaal_gemeente(pg[1, ], pg, geen_trend, NULL)
+  expect_match(z[1], "van de vergeleken gemeenten")
+})
+
+test_that("namen_van vertaalt keys naar gemeentenamen", {
+  res <- list(per_gemeente = pg_voorbeeld())
+  expect_equal(namen_van(c("NL", "b", "onbekend"), res),
+               c("heel Nederland", "B", "onbekend"))
+})

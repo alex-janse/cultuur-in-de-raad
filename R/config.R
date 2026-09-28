@@ -18,8 +18,10 @@ STANDAARD_BEGINJAAR <- 2020L
 standaard_periode <- function() c(STANDAARD_BEGINJAAR, huidig_jaar())
 
 # Versies van de voorberekende data. SCHEMA_VERSIE ophogen bij een andere
-# structuur van het resultaat; de methode-versie volgt automatisch uit de
-# instellingen die de telling bepalen (zie methode_versie() onderaan).
+# structuur van het resultaat, én bij een andere zoekvraag of telling in de
+# code (term_query, telling_aggs, ruw_naar_key, dekking_per_gemeente): die
+# zitten niet in de methode-versie, die alleen de instellingen volgt (zie
+# methode_versie() onderaan).
 SCHEMA_VERSIE <- 3L   # 2: trends per gemeente, dekking en bandbreedtes; 3: termkolommen n_<term>
 # Voorberekende data ouder dan dit wordt niet meer gebruikt (dan live)
 MAX_LEEFTIJD_DAGEN <- 7
@@ -51,7 +53,7 @@ PRIVACY_TEKST <- paste(
   "geen tekstfragmenten. Staat er iets over jou in een raadsstuk dat daar",
   "niet hoort? Verwijderen kan alleen bij de bron: de gemeente die het stuk",
   "publiceerde (en OpenBesluitvorming.nl). Is het daar weg, dan verdwijnt het",
-  "hier vanzelf, uiterlijk na de volgende nachtelijke bijwerking."
+  "hier vanzelf, meestal binnen een dag en uiterlijk na ongeveer een week."
 )
 
 # Een jaar telt als 'gedekt' (archief aanwezig) vanaf zoveel documenten

@@ -236,6 +236,7 @@ dekking_per_gemeente <- function(trends, vandaag = Sys.Date()) {
     filter(is.na(ONVOLLEDIGE_FUSIES[key]) | jaar >= ONVOLLEDIGE_FUSIES[key]) |>
     group_by(key) |>
     summarise(eerste_jaar = min(jaar),
+              laatste_jaar = max(jaar),
               jaren_dekking = sum(ifelse(jaar == jaar_nu, fractie_nu, 1)),
               treffers_dekking = sum(n),
               .groups = "drop")
