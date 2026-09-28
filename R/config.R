@@ -60,6 +60,7 @@ MIN_DOCS_DEKKING <- 50
 MIN_TREFFERS_RANG <- 10
 
 CBS_TABEL_BEVOLKING <- "70072ned"  # Regionale kerncijfers Nederland
+CBS_TABEL_BEVOLKING_IV3 <- "03759ned"  # bevolking per jaar, voor Iv3 per inwoner
 
 TERMEN <- list(
   "Kernthema's" = c("amateurkunst", "cultuurbeoefening", "cultuureducatie",

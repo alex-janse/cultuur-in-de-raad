@@ -217,6 +217,7 @@ ui <- function(request) {
             plotOutput("budget_plot", height = 560,
                        hover = hoverOpts("budget_hover", delay = 100)),
             uiOutput("budget_hover_info"),
+            uiOutput("budget_bron"),
             div(class = "knoppen",
                 downloadButton("dl_budget_png", "Grafiek (PNG)"),
                 downloadButton("dl_budget_csv", "Gegevens (CSV)")),
@@ -498,6 +499,12 @@ server <- function(input, output, session) {
       },
       if (!res$inwoners_ok) {
         tags$div(class = "text-warning", "CBS-inwonersdata niet beschikbaar.")
+      } else {
+        peiljaar <- sort(na.omit(res$per_gemeente$inwoners_jaar), decreasing = TRUE)[1]
+        label <- if (is.na(peiljaar)) "Inwoners: CBS" else
+          sprintf("Inwoners: CBS, 1 januari %s", peiljaar)
+        tagList(tags$br(), tags$small(
+          bron_regel(lees_voorberekend("bronversies.rds"), "inwoners", label) %||% label))
       }
     )
   })
@@ -837,6 +844,14 @@ server <- function(input, output, session) {
     "Spreidingsdiagram van %d gemeenten: cultuurlasten per inwoner tegen de",
     "aandacht in de raad, ingedeeld in vier profielen. De tabel hieronder",
     "toont de grootste verschillen."), nrow(budget_df()))))
+
+  output$budget_bron <- renderUI({
+    req(input$budget_keuze)
+    label <- paste("Bron: CBS Iv3,",
+                   tolower(names(IV3_KEUZES)[IV3_KEUZES == input$budget_keuze]))
+    regel <- bron_regel(lees_voorberekend("bronversies.rds"), input$budget_keuze, label)
+    if (!is.null(regel)) helpText(regel)
+  })
 
   output$budget_hover_info <- renderUI({
     df <- budget_df()

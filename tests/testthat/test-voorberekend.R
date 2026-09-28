@@ -75,3 +75,36 @@ test_that("zonder URL wordt er niets voorberekends gelezen", {
   withr::local_options(cultuur.voorberekend_url = NA)
   expect_null(lees_voorberekend("zoek_x.rds"))
 })
+
+test_that("de nachtelijke run gebruikt de bewaarde inwoners, ook als CBS onbereikbaar is", {
+  uitvoer <- withr::local_tempdir()
+  withr::local_options(cultuur.cache_map = withr::local_tempdir(),
+                       cultuur.voorberekend_url = NA)
+  expect_false(inwoners_naar_cache(uitvoer))
+
+  vorig <- tibble(key = "utrecht", gemeentecode = "GM0344", cbs_naam = "Utrecht",
+                  inwoners = 374000, inwoners_jaar = "2025")
+  saveRDS(vorig, file.path(uitvoer, "cbs_inwoners.rds"))
+  # Een oude datum op het bestand mag de cache niet laten verlopen
+  Sys.setFileTime(file.path(uitvoer, "cbs_inwoners.rds"), Sys.time() - 60 * 86400)
+  expect_true(inwoners_naar_cache(uitvoer))
+  # CBS wordt niet meer benaderd: de vorige versie komt uit de cache
+  local_mocked_bindings(cbs_get_meta = function(...) stop("CBS onbereikbaar"),
+                        .package = "cbsodataR")
+  expect_equal(haal_inwoners(), vorig)
+})
+
+test_that("bron_regel noemt de CBS-datum en meldt een mislukte controle", {
+  versies <- rbind(leeg_bronversies(), data.frame(
+    onderdeel = "inwoners", versie = "70072ned 2026-07-31",
+    bron_datum = "2026-07-31", opgehaald = "2026-08-01",
+    gecontroleerd = "2026-09-28"))
+  vandaag <- as.Date("2026-09-28")
+
+  expect_equal(bron_regel(versies, "inwoners", "Inwoners", vandaag),
+               "Inwoners, bijgewerkt door CBS op 31-07-2026")
+  expect_match(bron_regel(versies, "inwoners", "Inwoners", vandaag + 5),
+               "sinds 28-09-2026 niet bereikbaar")
+  expect_null(bron_regel(versies, "2024_rekening", "Budget", vandaag))
+  expect_null(bron_regel(NULL, "inwoners", "Inwoners", vandaag))
+})

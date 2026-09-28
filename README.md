@@ -58,6 +58,8 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
   CBS-cijfers en gemeentegrenzen vooraf uit en zet ze op de tak
   [`data`](../../tree/data). De app controleert inhoud, schemaversie en
   leeftijd voordat ze die gebruikt, en valt anders terug op live ophalen.
+  CBS-cijfers en gemeentegrenzen worden alleen opnieuw gedownload als de bron
+  een nieuwe versie heeft; de app toont wanneer CBS de cijfers bijwerkte.
 - **Zuinig met de API**: caching op schijf, in het geheugen en per proces, en
   een nette afhandeling van de verzoeklimiet (HTTP 429).
 - **Verantwoorde cijfers**: correctie voor archiefomvang en archiefdekking,
@@ -177,7 +179,8 @@ instellingen gaan live naar de API (ongeveer 15 seconden) en blijven daarna
 een uur in het geheugen.
 
 De nachtelijke voorberekening kun je ook zelf starten, via het tabblad
-*Actions* op GitHub of lokaal:
+*Actions* op GitHub (vink *CBS-cijfers en gemeentegrenzen opnieuw ophalen* aan om
+ook zonder nieuwe versie bij CBS te downloaden) of lokaal:
 
 ```sh
 Rscript scripts/voorbereken.R uitvoer
@@ -202,7 +205,7 @@ rsconnect::writeManifest(appFiles = c("app.R", list.files("R", full.names = TRUE
 app.R              UI en server
 R/config.R         termen, themasets, cultuurwoorden, fusies, CBS-tabellen
 R/api_ori.R        zoekvragen aan OpenBesluitvorming (Elasticsearch)
-R/cbs.R            inwoners en cultuurlasten (CBS)
+R/cbs.R            inwoners en cultuurlasten (CBS), controle op nieuwe versies
 R/geo.R            gemeentegrenzen (PDOK)
 R/kaart.R          kaartopbouw
 R/plots.R          grafieken

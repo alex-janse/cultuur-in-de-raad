@@ -7,6 +7,11 @@ on:
   schedule:
     - cron: "17 2 * * *"   # elke nacht om 02:17 UTC
   workflow_dispatch:        # handmatig starten via het tabblad Actions
+    inputs:
+      cbs_opnieuw:
+        description: "CBS-cijfers en gemeentegrenzen opnieuw ophalen, ook als ze niet gewijzigd zijn"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -44,6 +49,8 @@ jobs:
 
       - name: Voorberekenen
         run: Rscript scripts/voorbereken.R uitvoer
+        env:
+          CBS_OPNIEUW: ${{ inputs.cbs_opnieuw }}
 
       - name: Publiceren op tak 'data'
         run: |
@@ -60,6 +67,12 @@ jobs:
         run: |
           if [ -f onbekend.txt ]; then
             echo "::warning::Archieven zonder CBS-gemeente (vul FUSIES of CBS_NAAM_NAAR_KEY aan in R/config.R): $(paste -sd, onbekend.txt)"
+          fi
+
+      - name: Bronnen die niet te controleren waren melden
+        run: |
+          if [ -f niet_gecontroleerd.txt ]; then
+            echo "::warning::Niet te controleren op nieuwe cijfers (bron onbereikbaar; de vorige versie blijft staan): $(paste -sd, niet_gecontroleerd.txt)"
           fi
 
       - name: Controle op onderdelen die niet zijn bijgewerkt
