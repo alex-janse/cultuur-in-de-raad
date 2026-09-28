@@ -62,7 +62,8 @@ haal_cultuurlasten <- function(keuze = "2024_rekening") {
       rijen[[length(rijen) + 1]] <- js$value
       volgende <- js[["odata.nextLink"]]
       if (is.null(volgende)) break
-      req <- request(volgende) |> req_headers(Accept = "application/json")
+      req <- request(volgende) |> req_headers(Accept = "application/json") |>
+        req_timeout(90)
     }
     if (nrow(bind_rows(rijen)) == 0) {
       stop(sprintf("CBS heeft (nog) geen Iv3-data voor %s.", keuze))

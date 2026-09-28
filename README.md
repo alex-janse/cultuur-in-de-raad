@@ -60,6 +60,8 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
   leeftijd voordat ze die gebruikt, en valt anders terug op live ophalen.
   CBS-cijfers en gemeentegrenzen worden alleen opnieuw gedownload als de bron
   een nieuwe versie heeft; de app toont wanneer CBS de cijfers bijwerkte.
+  Een uitkomst die meer dan 20% afwijkt van de vorige wordt pas gepubliceerd
+  als de volgende nacht hetzelfde geeft; wat mislukt, laat de vorige versie staan.
 - **Zuinig met de API**: caching op schijf, in het geheugen en per proces, en
   een nette afhandeling van de verzoeklimiet (HTTP 429).
 - **Verantwoorde cijfers**: correctie voor archiefomvang en archiefdekking,
@@ -212,6 +214,7 @@ R/plots.R          grafieken
 R/ranking.R        ranking met bandbreedte
 R/cache.R          schijf-, geheugen- en procescache
 R/voorberekend.R   nachtelijk voorberekende data lezen en controleren
+R/nachtrun.R       beslissingen van de nachtelijke run (bijwerken, afkeuren, opruimen)
 R/export.R         CSV-export
 R/namen.R          naamnormalisatie en opmaak
 R/uitleg.R         tabblad Uitleg
