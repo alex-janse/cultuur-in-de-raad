@@ -75,3 +75,21 @@ test_that("zonder URL wordt er niets voorberekends gelezen", {
   withr::local_options(cultuur.voorberekend_url = NA)
   expect_null(lees_voorberekend("zoek_x.rds"))
 })
+
+test_that("zonder CBS gebruikt de nachtelijke run de inwoners van de vorige run", {
+  uitvoer <- withr::local_tempdir()
+  withr::local_options(cultuur.cache_map = withr::local_tempdir(),
+                       cultuur.voorberekend_url = NA)
+  expect_false(herstel_vorige_inwoners(uitvoer))
+
+  vorig <- tibble(key = "utrecht", gemeentecode = "GM0344", cbs_naam = "Utrecht",
+                  inwoners = 374000, inwoners_jaar = "2025")
+  saveRDS(vorig, file.path(uitvoer, "cbs_inwoners.rds"))
+  # Een oude datum op het bestand mag de cache niet laten verlopen
+  Sys.setFileTime(file.path(uitvoer, "cbs_inwoners.rds"), Sys.time() - 60 * 86400)
+  expect_true(herstel_vorige_inwoners(uitvoer))
+  # CBS wordt niet meer benaderd: de vorige versie komt uit de cache
+  local_mocked_bindings(cbs_get_meta = function(...) stop("CBS onbereikbaar"),
+                        .package = "cbsodataR")
+  expect_equal(haal_inwoners(), vorig)
+})

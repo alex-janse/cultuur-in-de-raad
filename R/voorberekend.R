@@ -140,6 +140,19 @@ haal_resultaat <- function(termen, jaren, opties) {
   }
 }
 
+# Voor de nachtelijke run: is CBS onbereikbaar, dan de inwoners van de vorige
+# run (uit de uitvoermap) in de schijfcache zetten. haal_inwoners() en dus de
+# zoekvragen gebruiken die dan, in plaats van een lege tabel zonder
+# gemeentecodes. Geeft TRUE als er een vorige versie was.
+herstel_vorige_inwoners <- function(uitvoer) {
+  vorig <- file.path(uitvoer, "cbs_inwoners.rds")
+  if (!file.exists(vorig)) return(FALSE)
+  dir.create(cache_map(), showWarnings = FALSE, recursive = TRUE)
+  # copy.date = FALSE: een verse wijzigingsdatum, anders geldt de cache als verlopen
+  file.copy(vorig, file.path(cache_map(), "cbs_inwoners.rds"),
+            overwrite = TRUE, copy.date = FALSE)
+}
+
 # Leeftijd van voorberekende data in dagen (voor een waarschuwing)
 leeftijd_dagen <- function(res) {
   as.numeric(difftime(Sys.time(), res$berekend_op, units = "days"))

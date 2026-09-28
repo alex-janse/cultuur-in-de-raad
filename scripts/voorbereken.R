@@ -55,7 +55,16 @@ bewaar <- function(data, bestand) {
 
 message("CBS-inwoners")
 inw <- probeer("inwoners", haal_inwoners)
-if (is.null(inw)) mislukt <- c(mislukt, "inwoners") else bewaar(inw, "cbs_inwoners.rds")
+if (is.null(inw)) {
+  mislukt <- c(mislukt, "inwoners")
+  # De zoekvragen koppelen archieven aan gemeenten via deze inwoners; zonder
+  # zouden ze zonder gemeentecodes (kaart, per inwoner) worden gepubliceerd
+  if (herstel_vorige_inwoners(uitvoer)) {
+    message("  zoekvragen gebruiken de inwoners van de vorige run")
+  }
+} else {
+  bewaar(inw, "cbs_inwoners.rds")
+}
 
 for (keuze in IV3_KEUZES) {
   message("CBS Iv3 ", keuze)
@@ -109,7 +118,14 @@ for (naam in names(voorberekende_sets())) {
       berekend_op = format(res$berekend_op, "%Y-%m-%d %H:%M %Z")
     )
   }
-  reden <- if (is.null(rij)) "ophalen mislukt" else verdacht(naam, rij)
+  reden <- if (is.null(rij)) {
+    "ophalen mislukt"
+  } else if (!isTRUE(res$inwoners_ok)) {
+    # Zonder koppeling aan CBS-gemeenten geen kaart en geen cijfers per inwoner
+    "geen CBS-inwoners"
+  } else {
+    verdacht(naam, rij)
+  }
   if (!is.null(reden)) {
     message(sprintf("  %s niet bijgewerkt: %s", naam, reden))
     mislukt <- c(mislukt, sprintf("%s (%s)", naam, reden))
