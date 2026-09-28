@@ -612,7 +612,8 @@ server <- function(input, output, session) {
         `Per 1.000 docs` = per_1000,
         `Per 100k inw./jaar` = per_100k,
         Totaal = totaal,
-        across(all_of(res$termen)),
+        across(all_of(term_kolom(res$termen)),
+               .names = "Treffers {sub('^n_', '', .col)}"),
         `Archief (docs)` = archief,
         `Jaren met archief` = jaren_dekking,
         Inwoners = inwoners,
@@ -626,7 +627,7 @@ server <- function(input, output, session) {
     df <- ranking_tabel()
     shiny::validate(need(nrow(df) > 0, "Geen resultaten."))
     cijfers <- if (maatstaf() == "absoluut") 0 else 1
-    termen <- resultaat()$termen
+    termen <- paste("Treffers", resultaat()$termen)
     eenheid <- EENHEDEN[[maatstaf()]]
     tabel <- df |>
       transmute(

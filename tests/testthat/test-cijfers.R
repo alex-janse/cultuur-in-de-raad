@@ -7,7 +7,7 @@ test_that("is_cultuurterm herkent cultuurtermen alleen aan het begin van een woo
   expect_false(is_cultuurterm("kunstgras"))          # uitgezonderd
   expect_false(is_cultuurterm("kunstwerken"))        # bruggen en viaducten
   expect_false(is_cultuurterm("talentontwikkeling"))
-  expect_false(is_cultuurterm("bibliotheek"))
+  expect_true(is_cultuurterm("bibliotheek"))        # openbare bibliotheek, taakveld 5.6
 })
 
 test_that("dekking: jaren met archief, het lopende jaar naar rato", {
@@ -70,4 +70,69 @@ test_that("periode_jaren telt het lopende jaar naar rato", {
   fractie <- as.numeric(format(vandaag, "%j")) / 365
   expect_equal(periode_jaren(c(2020, 2026), vandaag), 6 + fractie)
   expect_equal(periode_jaren(c(2020, 2024), vandaag), 5)
+})
+
+test_that("onvolledige fusie: alleen jaren en treffers vanaf de fusie", {
+  trends <- tibble(
+    key = c(rep("voorne_aan_zee", 4), rep("utrecht", 4)),
+    jaar = rep(2021:2024, 2), term = "__alle__",
+    n = c(10, 10, 20, 20, 5, 5, 5, 5), archief = 1000)
+  d <- dekking_per_gemeente(trends, vandaag = as.Date("2026-07-02"))
+  v <- d[d$key == "voorne_aan_zee", ]
+  expect_equal(v$eerste_jaar, 2023)
+  expect_equal(v$jaren_dekking, 2)
+  expect_equal(v$treffers_dekking, 40)
+  expect_equal(d$treffers_dekking[d$key == "utrecht"], 20)
+})
+
+test_that("per 100.000 inwoners telt alleen treffers uit jaren met dekking", {
+  pg <- tibble(key = "a", archief = 5000, totaal = 60, treffers_dekking = 50,
+               inwoners = 1e5, jaren_dekking = 5)
+  expect_equal(bereken_maatstaven(pg)$per_100k, 10)
+  expect_equal(bereken_maatstaven(pg)$per_1000, 12)   # ratio over het hele archief
+})
+
+test_that("een periode van alleen het lopende jaar geeft toch waarden", {
+  pg <- tibble(key = "a", archief = 3000, totaal = 30, inwoners = 1e5,
+               jaren_dekking = 0.74)
+  expect_true(is.na(bereken_maatstaven(pg)$per_1000))
+  expect_false(is.na(bereken_maatstaven(pg, min_dekking = 0.74)$per_1000))
+})
+
+test_that("stabiele_hash hangt alleen af van de inhoud", {
+  expect_equal(stabiele_hash(list(a = c(x = 1L), b = "t")),
+               stabiele_hash(list(a = c(x = 1L), b = "t")))
+  expect_false(stabiele_hash(list(1, 2)) == stabiele_hash(list(2, 1)))
+  expect_false(stabiele_hash(c(a = "x")) == stabiele_hash(c(b = "x")))
+  # Vaste waarde: verandert die, dan passen voorberekende sleutels niet meer
+  expect_equal(stabiele_hash(list(termen = c("a", "b"), jaren = 2020:2021)),
+               as.character(openssl::md5("{termen:[=a,=b],jaren:[=2020,=2021]}")))
+})
+
+test_that("zoektermen met de naam van een kolom tellen gewoon", {
+  withr::local_options(cultuur.cache_map = withr::local_tempdir(),
+                       cultuur.voorberekend_url = NA)
+  saveRDS(tibble(key = "utrecht", gemeentecode = "GM0344", cbs_naam = "Utrecht",
+                 inwoners = 370000, inwoners_jaar = "2026"),
+          file.path(cache_map(), "cbs_inwoners.rds"))
+  termen <- c("gemeente", "totaal")
+  telling <- \(alle, g, t) list(buckets = list(`__alle__` = list(doc_count = alle),
+                                               gemeente = list(doc_count = g),
+                                               totaal = list(doc_count = t)))
+  jaar <- \(j) list(key_as_string = paste0(j, "-01-01T00:00:00"), doc_count = 2000,
+                    t = telling(5, 3, 2))
+  json <- list(
+    `_shards` = list(failed = 0, total = 1),
+    hits = list(total = list(value = 10), hits = list()),
+    aggregations = list(gemeenten = list(sum_other_doc_count = 0, buckets = list(
+      list(key = "ori_utrecht_20240101", doc_count = 4000, t = telling(10, 6, 4),
+           jaren = list(buckets = list(jaar(2024), jaar(2025)))))))
+  )
+  httr2::local_mocked_responses(function(req) httr2::response_json(body = json))
+  res <- haal_data_op(termen, c(2024L, 2025L), list(context = FALSE, dedup = FALSE))
+  pg <- res$per_gemeente
+  expect_equal(pg$gemeente, "Utrecht")
+  expect_equal(pg$totaal, 10)
+  expect_equal(pg$n_gemeente, 6)
+  expect_equal(pg$n_totaal, 4)
 })

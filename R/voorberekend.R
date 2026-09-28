@@ -19,7 +19,7 @@ voorberekende_sets <- function() {
 # methode-versie zit erin, zodat een gewijzigde telmethode nooit oude
 # uitkomsten oplevert.
 zoek_sleutel <- function(termen, jaren, opties) {
-  rlang::hash(list(
+  stabiele_hash(list(
     termen = sort(unique(termen)),
     jaren = as.integer(jaren),
     opties = vapply(c("context", "woordvormen", "dedup"),

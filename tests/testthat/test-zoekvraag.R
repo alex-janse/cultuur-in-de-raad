@@ -13,7 +13,9 @@ test_that("cultuurcontext geldt alleen voor termen die zelf niet over cultuur ga
 test_that("woordvormen alleen voor enkele woorden, met escaping", {
   opt <- list(context = FALSE, woordvormen = TRUE)
   expect_equal(term_query("amateurkunst", opt)$query_string$query, "amateurkunst*")
-  expect_equal(term_query("sint-jan", opt)$query_string$query, "sint\\-jan*")
+  # Met koppelteken: exacte woordgroep (een wildcard zou nooit iets vinden)
+  expect_named(term_query("sint-jan", opt), "multi_match")
+  expect_named(term_query("'s-hertogenbosch", opt), "multi_match")
   expect_named(term_query("kunst en cultuur", opt), "multi_match")
   ctx <- term_query("talentontwikkeling", list(context = TRUE, woordvormen = TRUE))
   expect_named(ctx$bool$should[[1]]$intervals$name$all_of$intervals[[1]], "prefix")

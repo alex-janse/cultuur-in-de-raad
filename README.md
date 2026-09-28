@@ -97,10 +97,10 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
 - **Alleen in cultuurcontext** (standaard aan): een term die zelf niet over
   cultuur gaat (zoals *talentontwikkeling*) telt alleen als binnen 15 woorden
   een cultuurwoord staat (cultuur, kunst, muziek, theater, museum, erfgoed,
-  …). Zonder deze eis gaat twee derde van de treffers voor
+  bibliotheek, …). Zonder deze eis gaat twee derde van de treffers voor
   *talentontwikkeling* over sport, onderwijs of jeugd.
-- **Woordvormen** (optioneel, voor termen vanaf 4 letters): *amateurkunst*
-  vindt dan ook *amateurkunstenaars*.
+- **Woordvormen** (optioneel, voor één woord vanaf 4 letters, zonder
+  koppelteken of spatie): *amateurkunst* vindt dan ook *amateurkunstenaars*.
 - **Jaren met archief**: per gemeente tellen alleen de jaren mee waarin het
   archief minstens 50 documenten heeft, en het lopende jaar naar rato. Zo
   worden gemeenten met een later begonnen of onvolledig archief niet
@@ -108,8 +108,8 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
 - **Per 1.000 raadsdocumenten**: de noemer is het aantal documenten van die
   gemeente in dezelfde periode. Gemeenten met minder dan 400 documenten per
   jaar met archief tellen bij deze maatstaf niet mee.
-- **Per 100.000 inwoners per jaar**: gedeeld door de jaren met archief, en
-  alleen voor gemeenten vanaf 20.000 inwoners. Kleinere gemeenten produceren
+- **Per 100.000 inwoners per jaar**: de treffers uit de jaren met archief,
+  gedeeld door die jaren, en alleen voor gemeenten vanaf 20.000 inwoners. Kleinere gemeenten produceren
   ongeveer evenveel raadsstukken en zouden anders bovenaan staan.
 - **Bandbreedte en ranking**: bij elke waarde staat een 95%-interval (exact
   Poisson). Gemeenten met minder dan 10 treffers krijgen geen rang, omdat hun
@@ -132,7 +132,9 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
   alleen door de jaren met archief, maar vergelijk liefst binnen één periode.
 - **Fusiegemeenten**: archieven van opgeheven gemeenten (Weesp, Beemster,
   Cuijk, Boxmeer, Brielle, …) tellen mee bij de huidige gemeente, tot de
-  fusiedatum.
+  fusiedatum. Heeft niet elke voorganger een archief (Voorne aan Zee: geen
+  Hellevoetsluis), dan telt 'per 100.000 inwoners' alleen de jaren vanaf de
+  fusie (`ONVOLLEDIGE_FUSIES` in `R/config.R`).
 - **Verzoeklimiet**: bij veel zoekvragen kort na elkaar geeft de API een
   melding (HTTP 429). Probeer het dan ongeveer 10 minuten later opnieuw; de
   standaardvragen en themasets zijn voorberekend en werken gewoon.
