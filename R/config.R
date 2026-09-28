@@ -98,6 +98,20 @@ PRIVACY_TEKST <- paste(
   "hier vanzelf, meestal binnen een dag en uiterlijk na ongeveer een week."
 )
 
+# Samenvoegen van dubbele bijlagen: Elasticsearch telt unieke bijlagen exact
+# tot dit aantal per gemeente, jaar en term, en schat daarboven (±1-2%). Een
+# hogere waarde kost per telling veel meer geheugen op de server van
+# OpenBesluitvorming (8 bytes per eenheid: 3.000 -> ~24 KB, 40.000 -> ~320 KB);
+# in september 2026 weigerde de server alle verzoeken wegens geheugengebrek
+# (HTTP 429, circuit_breaking_exception), en zware tellingen dragen daaraan bij.
+# Boven 3.000 per jaar komt vrijwel alleen de archiefomvang van grote steden.
+PRECISIE_UNIEK <- 3000
+
+# De nachtelijke run vraagt alle jaren op in delen van zoveel jaar: meer,
+# maar kleinere verzoeken, zodat het geheugen van de server per verzoek
+# beperkt blijft. De delen volgen de raadsperiodes (2010, 2018, 2026, ...).
+PERIODE_DEEL_JAREN <- 8
+
 # Een jaar telt als 'gedekt' (archief aanwezig) vanaf zoveel documenten
 MIN_DOCS_DEKKING <- 50
 # Minder treffers dan dit: geen plek in de ranking (te toevallig)
@@ -238,7 +252,7 @@ methode_versie <- function() {
     CULTUURWOORDEN, CONTEXT_AFSTAND, CULTUUR_STAMMEN, GEEN_CULTUUR,
     MIN_DOCS_DEKKING, MIN_TREFFERS_RANG, MIN_DOCS_PER_JAAR,
     MIN_INWONERS, FUSIES, ONVOLLEDIGE_FUSIES, CBS_NAAM_NAAR_KEY,
-    MIN_TEKENS_WOORDVORMEN, VELDEN
+    MIN_TEKENS_WOORDVORMEN, VELDEN, PRECISIE_UNIEK
   )), 1, 8)
 }
 

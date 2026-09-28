@@ -97,8 +97,23 @@ for (naam in names(voorberekende_sets())) {
 
   message("Zoekvraag ", naam, ": ", paste(termen, collapse = ", "))
   # Het resultaat bevat ook de trends van alle gemeenten
-  res <- probeer(naam, \() haal_data_op(termen, periode, STANDAARD_OPTIES))
-  Sys.sleep(PAUZE)
+  res <- if (VRIJ_ZOEKEN) {
+    probeer(naam, \() haal_data_op(termen, periode, STANDAARD_OPTIES))
+  } else {
+    # Alle jaren in delen: kleinere verzoeken, minder geheugen op de server
+    delen <- list()
+    for (deel in periode_delen(periode)) {
+      uitkomst <- probeer(sprintf("%s %d-%d", naam, deel[1], deel[2]),
+                          \() haal_data_op(termen, deel, STANDAARD_OPTIES))
+      Sys.sleep(PAUZE)
+      if (is.null(uitkomst)) break
+      delen[[length(delen) + 1]] <- uitkomst
+    }
+    if (length(delen) == length(periode_delen(periode))) {
+      voeg_delen_samen(delen, periode)
+    }
+  }
+  if (VRIJ_ZOEKEN) Sys.sleep(PAUZE)
   if (!is.null(res) && !VRIJ_ZOEKEN) {
     voorbeelden <- probeer(paste(naam, "(voorbeelden)"),
                            \() haal_voorbeelden(termen, periode, STANDAARD_OPTIES))
@@ -176,6 +191,12 @@ if (length(overzicht) > 0) {
   # Opruimen: zoekresultaten die niet (meer) in het overzicht staan, bv. na
   # een andere methode of periode, en Iv3-bestanden van oude keuzes
   oud <- op_te_ruimen(list.files(uitvoer), nieuw$sleutel)
+  # Bij een overgang naar een nieuwe versie van de app (OUDE_BEWAREN=true,
+  # handmatige run): de oude zoekresultaten laten staan, zodat de huidige app
+  # blijft werken tot de nieuwe online staat. De volgende run ruimt ze op.
+  if (identical(Sys.getenv("OUDE_BEWAREN"), "true")) {
+    oud <- setdiff(oud, grep("^zoek_", oud, value = TRUE))
+  }
   if (length(oud) > 0) {
     file.remove(file.path(uitvoer, oud))
     message("Opgeruimd: ", paste(oud, collapse = ", "))

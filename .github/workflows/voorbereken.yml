@@ -12,6 +12,10 @@ on:
         description: "CBS-cijfers en gemeentegrenzen opnieuw ophalen, ook als ze niet gewijzigd zijn"
         type: boolean
         default: false
+      oude_bewaren:
+        description: "Oude zoekresultaten laten staan (bij de overgang naar een nieuwe versie van de app)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -71,6 +75,7 @@ jobs:
         run: Rscript scripts/voorbereken.R uitvoer
         env:
           CBS_OPNIEUW: ${{ inputs.cbs_opnieuw }}
+          OUDE_BEWAREN: ${{ inputs.oude_bewaren }}
 
       - name: Publiceren op tak 'data'
         env:

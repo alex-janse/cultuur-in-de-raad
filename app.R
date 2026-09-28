@@ -167,7 +167,8 @@ ui <- function(request) {
         hr(),
         uiOutput("status"),
         div(class = "knoppen",
-            bookmarkButton("Link naar deze zoekopdracht",
+            bookmarkButton(if (VRIJ_ZOEKEN) "Link naar deze zoekopdracht"
+                           else "Link naar deze weergave",
                            title = "Maak een link die deze instellingen bewaart")),
         hr(),
         helpText("Bronnen: OpenBesluitvorming.nl / Open Raadsinformatie,",
@@ -199,7 +200,7 @@ ui <- function(request) {
                     downloadButton("dl_ranking", "Ranking (CSV)"))),
             DT::DTOutput("tabel"),
             helpText(paste("Bandbreedte: 95%-interval; overlappen twee",
-                           "bandbreedtes, dan is het verschil niet betekenisvol.",
+                           "bandbreedtes sterk, dan is het verschil waarschijnlijk toeval.",
                            "Gemeenten met minder dan", MIN_TREFFERS_RANG,
                            "treffers krijgen geen rang. Klik op een kolomkop",
                            "om te sorteren."))

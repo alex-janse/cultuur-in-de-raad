@@ -95,3 +95,35 @@ test_that("de trendgrafiek krijgt vlakken en lijnen bij een markering", {
   kaal <- plot_trend(df, c("x", "y"), c(2016L, 2025L))
   expect_false(any(vapply(kaal$layers, \(l) class(l$geom)[1], "") == "GeomRect"))
 })
+
+test_that("periode_delen volgt de raadsperiodes", {
+  expect_equal(periode_delen(c(2010L, 2026L), 8),
+               list(c(2010L, 2017L), c(2018L, 2025L), c(2026L, 2026L)))
+  expect_equal(periode_delen(c(2010L, 2013L), 8), list(c(2010L, 2013L)))
+})
+
+test_that("voeg_delen_samen geeft hetzelfde als één resultaat over alle jaren", {
+  heel <- volledig()
+  deel <- function(van, tot) {
+    d <- heel
+    d$trends <- heel$trends |> filter(jaar >= van, jaar <= tot)
+    d$per_gemeente <- heel$per_gemeente |> mutate(ruw = as.list(paste0(key, van)))
+    d$docs <- tibble(key = "a", titel = paste("doc", van), datum = paste0(tot, "-06-01"),
+                     link = "", gemeente = "A")
+    d$inwoners_ok <- TRUE
+    d$docs_jaren <- NULL   # komt pas later uit haal_voorbeelden
+    d
+  }
+  samen <- voeg_delen_samen(list(deel(2016L, 2019L), deel(2020L, 2025L)), c(2016L, 2025L))
+  a <- samen$per_gemeente[samen$per_gemeente$key == "a", ]
+  expect_equal(a$totaal, 100)              # 10 jaar x 10
+  expect_equal(a$jaren_dekking, 10)
+  expect_equal(samen$jaren, c(2016L, 2025L))
+  expect_null(samen$periode_volledig)
+  expect_equal(range(samen$trends$jaar), c(2016L, 2025L))
+  # De indexnamen van alle delen blijven bewaard (voor stadsdelen en fusies)
+  expect_setequal(a$ruw[[1]], c("a2016", "a2020"))
+  expect_equal(samen$docs$titel[1], "doc 2020")
+  # Een blok uit het samengevoegde resultaat klopt ook
+  expect_equal(blok_resultaat(samen, c(2018L, 2021L))$per_gemeente$totaal[1], 40)
+})

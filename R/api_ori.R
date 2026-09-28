@@ -68,8 +68,9 @@ of_query <- function(termen, opties = STANDAARD_OPTIES) {
 telling_aggs <- function(dedup) {
   if (!isTRUE(dedup)) return(NULL)
   list(
+    # Exact tot PRECISIE_UNIEK per bucket, daarboven een schatting (zie config)
     uniek = list(cardinality = list(field = "size_in_bytes",
-                                    precision_threshold = 40000)),
+                                    precision_threshold = PRECISIE_UNIEK)),
     zonder = list(filter = list(bool = list(must_not = list(
       exists = list(field = "size_in_bytes")))))
   )
