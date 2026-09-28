@@ -205,7 +205,7 @@ rsconnect::writeManifest(appFiles = c("app.R", list.files("R", full.names = TRUE
 app.R              UI en server
 R/config.R         termen, themasets, cultuurwoorden, fusies, CBS-tabellen
 R/api_ori.R        zoekvragen aan OpenBesluitvorming (Elasticsearch)
-R/cbs.R            inwoners en cultuurlasten (CBS)
+R/cbs.R            inwoners en cultuurlasten (CBS), controle op nieuwe versies
 R/geo.R            gemeentegrenzen (PDOK)
 R/kaart.R          kaartopbouw
 R/plots.R          grafieken

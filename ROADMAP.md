@@ -2,7 +2,7 @@
 
 ## Stand van zaken
 - **Afgerond**: fase 0 (stabiliteit), 1 (cijfers), 2 (veiligheid), het grootste deel
-  van fase 3 (gebruiksgemak) en 4.3 (vergelijkbare gemeenten).
+  van fase 3 (gebruiksgemak), 4.3 (vergelijkbare gemeenten) en 5.7 (CBS-bronnen).
 - **Open**: de beoordeling van de validatie-steekproef (1.7), de telefoonweergave
   (3.6) en de rest van fase 4 en 5.
 
@@ -96,6 +96,7 @@ per term bekend (na het invullen door een vakinhoudelijk persoon).
 | 5.4 | **Geheugen**: verwerkte resultaten cachen in plaats van ruwe JSON (max ~50 MB); `bindCache()` op grafieken. |
 | 5.5 | **End-to-end-test** met shinytest2 of chromote tegen de online app (dagelijks, ook als uptime-check). |
 | 5.6 | **Screenshots en projectpagina automatisch bijwerken** na een release. |
+| 5.7 | **CBS-bronnen robuust en zuinig** — afgerond (PR #8): na de CBS-storing van 27 september geen zoekresultaten meer zonder gemeentecodes; CBS-tabellen en gemeentegrenzen alleen downloaden bij een nieuwe versie (wijzigingsdatum bij CBS, jaar bij PDOK); bij een onbereikbare bron een waarschuwing in plaats van een fout; in de app de datum waarop CBS de cijfers bijwerkte. |
 
 ---
 
