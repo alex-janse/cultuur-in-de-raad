@@ -16,8 +16,8 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
 [Projectpagina](https://alex-janse.github.io/cultuur-in-de-raad/) ·
 [Roadmap](ROADMAP.md)
 
-> De app draait gratis op Posit Connect Cloud. Na een stille periode duurt het
-> opstarten even.
+> De app draait gratis op Posit Connect Cloud. Is er even niemand verbonden,
+> dan start de server opnieuw op en duurt het openen een paar seconden langer.
 
 ![Kaart en ranking](docs/img/kaart.png)
 
@@ -71,9 +71,11 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
   een nieuwe versie heeft; de app toont wanneer CBS de cijfers bijwerkte.
   Een uitkomst die meer dan 20% afwijkt van de vorige wordt pas gepubliceerd
   als de volgende nacht hetzelfde geeft; wat mislukt, laat de vorige versie staan.
-- **Snel bij veel bezoekers**: getekende grafieken en kaartdata worden
-  gedeeld tussen bezoekers (`bindCache`), dus wie hetzelfde thema en dezelfde
-  periode bekijkt, krijgt ze direct.
+- **Snel bij veel bezoekers**: getekende grafieken, kaartdata en opgetelde
+  periodes worden gedeeld tussen bezoekers (`bindCache`), dus wie hetzelfde
+  thema en dezelfde periode bekijkt, krijgt ze direct. Bij het starten haalt
+  de server alle voorberekende bestanden tegelijk op, en de kaartcoördinaten
+  zijn afgerond op ~10 m (de helft minder verkeer per bezoeker).
 - **Zuinig met de API**: één nachtelijke run met pauzes tussen de verzoeken,
   en een nette afhandeling van HTTP 429. Let op: een 429 kan ook betekenen dat
   de server van OpenBesluitvorming geheugen tekortkomt

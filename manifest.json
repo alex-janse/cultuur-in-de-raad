@@ -2682,7 +2682,7 @@
   },
   "files": {
     "app.R": {
-      "checksum": "4459e6d997ba2133bf978a7250b56358"
+      "checksum": "ee2e013c1f04e4f67ca40398c2195b2e"
     },
     "R/00_pakketten.R": {
       "checksum": "8cbd0326cdeca71d715fdbac31aa17ab"
@@ -2703,7 +2703,7 @@
       "checksum": "2f4d14fa8953d8afd0372618e00fc01c"
     },
     "R/geo.R": {
-      "checksum": "9c85ef550e7888ffbe584cc0031ff584"
+      "checksum": "7608a5b5217eebefcfe892f58a630bee"
     },
     "R/kaart.R": {
       "checksum": "a27587d262a6912e5f24acbdf5c55638"
@@ -2724,7 +2724,7 @@
       "checksum": "2f0d3784c40eaf9b3d9d7d65a239a532"
     },
     "R/voorberekend.R": {
-      "checksum": "66a68e1f2dd83a66878e8b84fb64ca04"
+      "checksum": "108065995932ccd6a0db0fc924d70b4d"
     }
   },
   "users": null

@@ -97,6 +97,50 @@ lees_voorberekend <- function(bestand) {
   uitkomst$data
 }
 
+# Meerdere voorberekende bestanden tegelijk ophalen, bij het starten van een
+# proces. Anders wacht de eerste bezoeker op losse downloads na elkaar (~1 s
+# extra), en daarna is wisselen van thema direct. Mislukt er iets, dan haalt
+# lees_voorberekend() het later gewoon zelf op.
+haal_voorberekend_vooraf <- function(bestanden) {
+  basis <- voorberekend_url()
+  if (is.na(basis) || !nzchar(basis) || startsWith(basis, "file://")) {
+    return(invisible(0L))
+  }
+  verzoeken <- lapply(bestanden, function(b) {
+    request(paste0(basis, "/", b)) |>
+      req_timeout(10) |>
+      req_error(is_error = \(r) FALSE)
+  })
+  antwoorden <- tryCatch(
+    req_perform_parallel(verzoeken, on_error = "continue", progress = FALSE),
+    error = function(e) list())
+  gelukt <- 0L
+  for (i in seq_along(antwoorden)) {
+    r <- antwoorden[[i]]
+    if (!inherits(r, "httr2_response") || resp_status(r) != 200) next
+    pad <- tempfile(fileext = ".rds")
+    data <- tryCatch({
+      writeBin(resp_body_raw(r), pad)
+      lees_rds_veilig(pad)
+    }, error = \(e) NULL)
+    unlink(pad)
+    if (is.null(data)) next
+    voorberekend_geheugen[[bestanden[[i]]]] <- list(
+      data = data, geldig_tot = Sys.time() + 3600)
+    gelukt <- gelukt + 1L
+  }
+  invisible(gelukt)
+}
+
+# Alles wat de app zonder vrij zoeken nodig heeft
+voorberekende_bestanden <- function() {
+  sleutels <- vapply(voorberekende_sets(), \(t) {
+    zoek_sleutel(t, volledige_periode(), STANDAARD_OPTIES)
+  }, "")
+  c("bronversies.rds", "gemeentegrenzen.rds", sprintf("iv3_%s.rds", IV3_KEUZES),
+    sprintf("zoek_%s.rds", sleutels))
+}
+
 # Een voorberekend resultaat alleen gebruiken als het past bij deze versie
 # van de app en niet te oud is. Anders NULL: dan wordt er live gezocht.
 VERPLICHTE_VELDEN <- c("per_gemeente", "jaren_nl", "docs", "totaal_docs",

@@ -48,3 +48,14 @@ haal_gemeentegrenzen <- function(jaren = c(huidig_jaar(), huidig_jaar() - 1)) {
       dplyr::transmute(gemeentecode = statcode, grensnaam = statnaam)
   })
 }
+
+# Coördinaten afronden voor de kaart: 4 decimalen is ~10 m, onzichtbaar bij
+# grenzen die al tot ~250 m zijn vereenvoudigd. Halveert wat leaflet naar elke
+# bezoeker stuurt (~380 -> ~180 KB). Alleen voor weergave, niet om mee te rekenen.
+rond_grenzen_af <- function(grenzen, decimalen = 4) {
+  vormen <- lapply(sf::st_geometry(grenzen), function(vorm) {
+    rapply(vorm, \(m) round(m, decimalen), how = "replace")
+  })
+  sf::st_geometry(grenzen) <- sf::st_sfc(vormen, crs = sf::st_crs(grenzen))
+  grenzen
+}
