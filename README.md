@@ -225,6 +225,16 @@ Lokaal:
 Rscript scripts/voorbereken.R uitvoer
 ```
 
+Schermafbeeldingen voor README en projectpagina opnieuw maken, en een
+loadtest met N gelijktijdige bezoekers tegen de online app. Beide gebruiken
+een headless Chrome (pakketten `chromote` en `callr`) en doen geen verzoeken
+aan de API van OpenBesluitvorming:
+
+```sh
+Rscript scripts/screenshots.R
+Rscript scripts/loadtest.R 1 5 10 20
+```
+
 Tests draaien (zonder netwerk):
 
 ```sh
@@ -255,7 +265,7 @@ R/nachtrun.R       nachtelijke run: bijwerken, afkeuren, opruimen, delen samenvo
 R/export.R         CSV-export
 R/namen.R          naamnormalisatie en opmaak
 R/uitleg.R         tabblad Uitleg
-scripts/           nachtelijke voorberekening en validatie
+scripts/           nachtelijke voorberekening, validatie, schermafbeeldingen en loadtest
 tests/testthat/    tests met vaste voorbeelden (fixtures)
 docs/              projectpagina (GitHub Pages) en screenshots
 .github/workflows/ tests en nachtelijke voorberekening
