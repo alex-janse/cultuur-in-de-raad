@@ -2,7 +2,8 @@
 
 ## Stand van zaken
 - **Afgerond**: fase 0 (stabiliteit), 1 (cijfers), 2 (veiligheid), het grootste deel
-  van fase 3 (gebruiksgemak), 4.3 (vergelijkbare gemeenten) en 5.7–5.8 (CBS-bronnen, tweede code-review).
+  van fase 3 (gebruiksgemak), 4.3 (vergelijkbare gemeenten), 4.4 (meer perioden) en 5.7–5.9 (CBS-bronnen,
+  tweede code-review, vaste thema's zonder live API).
 - **Open**: de beoordeling van de validatie-steekproef (1.7), de telefoonweergave
   (3.6) en de rest van fase 4 en 5.
 
@@ -85,7 +86,7 @@ per term bekend (na het invullen door een vakinhoudelijk persoon).
 | 4.1 | **Documentsoort** (motie, amendement, raadsvoorstel, besluit, bijlage, verslag) uit titelwoorden, als filter en als uitsplitsing. |
 | 4.2 | **Budget per thema**: bibliotheek → taakveld 5.6, cultuureducatie → 5.3; afschrijvingen en verrekeningen apart. |
 | 4.3 | **Vergelijkbare gemeenten**: vergelijken met gemeenten van dezelfde grootteklasse of stedelijkheid (CBS). |
-| 4.4 | **Meer voorberekende perioden** (bijv. 2015–nu, laatste 3 jaar) voor snelle langjarige trends. |
+| 4.4 | **Meer voorberekende perioden** — afgerond via 5.9: raadsperiodes, landelijke cultuurperiodes en alle jaren sinds 2010. |
 
 ## Fase 5: Onderhoud en portfolio
 | # | Wat |
@@ -95,7 +96,8 @@ per term bekend (na het invullen door een vakinhoudelijk persoon).
 | 5.3 | **app.R opsplitsen in Shiny-modules** per tabblad; helper `opties_uit(input)`. |
 | 5.4 | **Geheugen**: verwerkte resultaten cachen in plaats van ruwe JSON (max ~50 MB); `bindCache()` op grafieken. |
 | 5.5 | **End-to-end-test** met shinytest2 of chromote tegen de online app (dagelijks, ook als uptime-check). |
-| 5.6 | **Screenshots en projectpagina automatisch bijwerken** na een release. |
+| 5.6 | **Screenshots en projectpagina automatisch bijwerken** na een release. Deels afgerond: `Rscript scripts/screenshots.R` maakt ze opnieuw (nog niet automatisch na een release). |
+| 5.9 | **Vaste thema's en periodes, geen live API** — afgerond: vrij zoeken uit (`VRIJ_ZOEKEN`, code blijft), periodeblokken van vier jaar uit voorberekende cijfers per jaar, voorberekende fragmenten en documenten, trend met corona en verkiezingen, grafieken gedeeld tussen bezoekers (`bindCache`). Nachtelijke run in delen van acht jaar en een lagere precisie voor het samenvoegen van bijlagen (`PRECISIE_UNIEK` 3.000), nadat de server van OpenBesluitvorming alle verzoeken weigerde wegens geheugengebrek (circuit breaker); zware tellingen dragen daaraan bij. Later eventueel: vrij combineren van vaste termen via een eigen database (na afstemming met Open State Foundation). |
 | 5.8 | **Tweede volledige code-review (45 punten)** — afgerond (PR #9–#12): nachtelijke run kan geen data meer wissen of slechte data publiceren (tijdsbudget, bevestigen van echte afwijkingen, plausibiliteit CBS/PDOK); fragmenten op de achtergrond en alleen volledige resultaten cachen; zoektermen die als kolomnaam bestaan, onvolledige fusies, het lopende jaar, "bibliotheek" als cultuurwoord en stabiele sleutels over R-versies; kleine app- en tekstpunten. |
 | 5.7 | **CBS-bronnen robuust en zuinig** — afgerond (PR #8): na de CBS-storing van 27 september geen zoekresultaten meer zonder gemeentecodes; CBS-tabellen en gemeentegrenzen alleen downloaden bij een nieuwe versie (wijzigingsdatum bij CBS, jaar bij PDOK); bij een onbereikbare bron een waarschuwing in plaats van een fout; in de app de datum waarop CBS de cijfers bijwerkte. |
 

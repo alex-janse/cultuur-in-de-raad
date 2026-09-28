@@ -112,8 +112,8 @@
 
   <main>
     <figure>
-      <img src="img/kaart.png" alt="Dashboard met links de zoekinstellingen, een kaart van Nederland met gemeenten ingekleurd naar het aantal raadsdocumenten over cultuurthema's per 1.000 documenten, en daaronder een sorteerbare ranking met bandbreedte.">
-      <figcaption>Aandacht voor amateurkunst, cultuurbeoefening en talentontwikkeling per 1.000 raadsdocumenten, 2020–2026, met een 95%-bandbreedte per gemeente.</figcaption>
+      <img src="img/kaart.png" alt="Dashboard met links de keuze voor thema en periode, een kaart van Nederland met gemeenten ingekleurd naar het aantal raadsdocumenten over cultuurthema's per 1.000 documenten, en daaronder een sorteerbare ranking met bandbreedte.">
+      <figcaption>Aandacht voor amateurkunst, cultuurbeoefening en talentontwikkeling per 1.000 raadsdocumenten in de raadsperiode 2022–2025, met een 95%-bandbreedte per gemeente.</figcaption>
     </figure>
 
     <h2>Wat kun je ermee?</h2>
@@ -127,8 +127,12 @@
         <p>De rang binnen de eigen grootteklasse, zodat een grote stad wordt vergeleken met andere grote steden.</p>
       </div>
       <div class="blok">
+        <h3>Thema's en periodes</h3>
+        <p>Vaste thema's en periodes van vier jaar: raadsperiodes, landelijke cultuurperiodes of alle jaren sinds 2010. Alles voorberekend, dus direct beschikbaar.</p>
+      </div>
+      <div class="blok">
         <h3>Trend en vergelijken</h3>
-        <p>Een eigen grafiek per term, voor tot vier gemeenten naast heel Nederland.</p>
+        <p>Een eigen grafiek per term, voor tot vier gemeenten naast heel Nederland, met de coronaperiode en de verkiezingen gemarkeerd.</p>
       </div>
       <div class="blok">
         <h3>Gemeenteprofiel</h3>
@@ -140,7 +144,7 @@
       </div>
       <div class="blok">
         <h3>Uitleg en export</h3>
-        <p>De methode in gewone taal, CSV- en PNG-export en een deelbare link die de zoekopdracht bewaart.</p>
+        <p>De methode in gewone taal, CSV- en PNG-export en een deelbare link die thema, periode en keuzes bewaart.</p>
       </div>
     </div>
 
@@ -170,24 +174,24 @@
     </div>
 
     <figure>
-      <img src="img/trend.png" alt="Lijngrafieken per zoekterm met de aandacht per jaar voor Nederland, Tilburg en Utrecht.">
-      <figcaption>Trend per term, met Tilburg en Utrecht naast heel Nederland.</figcaption>
+      <img src="img/trend.png" alt="Lijngrafieken per zoekterm met de aandacht per jaar sinds 2010 voor Nederland, Tilburg en Utrecht, met de gekozen periode, de coronaperiode en de verkiezingsjaren gemarkeerd.">
+      <figcaption>Trend per term sinds 2010, met Tilburg en Utrecht naast heel Nederland. Blauw: gekozen periode; grijs: coronaperiode; stippellijnen: gemeenteraadsverkiezingen.</figcaption>
     </figure>
 
     <figure>
       <img src="img/budget.png" alt="Spreidingsdiagram met cultuurlasten per inwoner op de horizontale as en aandacht in de raad op de verticale as, met gemeenten ingedeeld in vier profielen.">
-      <figcaption>Aandacht in de raad naast de cultuurlasten per inwoner (jaarrekening 2024).</figcaption>
+      <figcaption>Aandacht in de raad (2022–2025) naast de cultuurlasten per inwoner (jaarrekening 2024).</figcaption>
     </figure>
 
     <h2>Onder de motorkap</h2>
     <div class="raster">
       <div class="blok">
-        <h3>Niet-blokkerend zoeken</h3>
-        <p>Live zoekvragen aan de Elasticsearch-API lopen asynchroon (<code>ExtendedTask</code> + <code>mirai</code>), zodat andere bezoekers door kunnen werken.</p>
+        <h3>Geen live verzoeken</h3>
+        <p>De app gebruikt alleen voorberekende data, dus een trage of overbelaste API raakt bezoekers niet. Getekende grafieken worden gedeeld tussen bezoekers (<code>bindCache</code>). Vrij zoeken zit nog in de code (<code>ExtendedTask</code> + <code>mirai</code>) en kan weer aan.</p>
       </div>
       <div class="blok">
         <h3>Nachtelijke voorberekening</h3>
-        <p>Een GitHub Action rekent de standaardvragen vooraf uit. CBS-cijfers en gemeentegrenzen worden alleen opnieuw gedownload als de bron een nieuwe versie heeft; bij een storing blijft de vorige versie staan. De app controleert de data op versie en leeftijd en valt anders terug op live ophalen.</p>
+        <p>Een GitHub Action rekent elk thema over alle jaren uit, in lichte delen van acht jaar, plus de nieuwste vermeldingen per gemeente. De app telt de periodes daaruit op. CBS-cijfers en gemeentegrenzen worden alleen opnieuw gedownload als de bron een nieuwe versie heeft; bij een storing blijft de vorige versie staan.</p>
       </div>
       <div class="blok">
         <h3>Getest en veilig</h3>
@@ -206,7 +210,7 @@ shiny::runApp()</code></pre>
     <h2>Kanttekeningen</h2>
     <ul>
       <li>51 van de 342 gemeenten hebben geen archief in OpenBesluitvorming.</li>
-      <li>Archieven gaan niet overal even ver terug. Vergelijk daarom binnen één periode.</li>
+      <li>Archieven gaan niet overal even ver terug: in 2010 hebben ongeveer 120 gemeenten een archief, nu ongeveer 280. Vergelijk daarom binnen één periode.</li>
       <li>Een vermelding is geen beleid: het kan om een bijlage of een verworpen motie gaan. Het gemeenteprofiel toont de zinnen, zodat je dat kunt nagaan.</li>
       <li>Het cultuurbudget is een indicatie: kapitaallasten en verrekeningen tellen mee.</li>
     </ul>

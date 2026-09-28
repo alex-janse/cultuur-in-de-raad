@@ -13,8 +13,10 @@ thema_dashboard <- function(base_size = 14) {
 # df: gebied, jaar, term, n, archief (term '__alle__' = minstens één term).
 # Eén paneel per term met een eigen y-as, zodat kleine termen zichtbaar zijn.
 # alleen_totaal = TRUE: één paneel met 'minstens één van de termen'.
+# markering: NULL, of list(blok = c(van, tot), corona = c(van, tot),
+# lijnen = jaren, lijn_uitleg = tekst) voor achtergrondvlakken en stippellijnen.
 plot_trend <- function(df, termen, jaren, relatief = TRUE, titel = NULL,
-                       alleen_totaal = FALSE) {
+                       alleen_totaal = FALSE, markering = NULL) {
   if (alleen_totaal) {
     df <- df |> filter(term == "__alle__")
     termen <- ALLE_TERMEN_LABEL
@@ -39,7 +41,20 @@ plot_trend <- function(df, termen, jaren, relatief = TRUE, titel = NULL,
   met_lopend <- any(df$lopend)
 
   stap <- max(1, ceiling((jaren[2] - jaren[1]) / 8))
-  ggplot(df, aes(jaar, waarde, colour = gebied)) +
+  p <- ggplot(df, aes(jaar, waarde, colour = gebied))
+  uitleg <- NULL
+  if (!is.null(markering)) {
+    lijnen <- markering$lijnen[markering$lijnen >= jaren[1] & markering$lijnen <= jaren[2]]
+    p <- p +
+      annotate("rect", xmin = markering$blok[1] - 0.5, xmax = markering$blok[2] + 0.5,
+               ymin = -Inf, ymax = Inf, fill = KLEUR_BLOK, alpha = 0.35) +
+      annotate("rect", xmin = markering$corona[1], xmax = markering$corona[2],
+               ymin = -Inf, ymax = Inf, fill = "grey55", alpha = 0.18) +
+      geom_vline(xintercept = lijnen, linetype = "dotted", colour = "grey35")
+    uitleg <- paste0("Blauw vlak: gekozen periode. Grijs vlak: coronaperiode. ",
+                     "Stippellijnen: ", markering$lijn_uitleg, ".")
+  }
+  p +
     geom_line(data = \(d) d[d$jaar < jaar_nu, ], linewidth = 1, na.rm = TRUE) +
     geom_line(data = \(d) d[d$jaar >= jaar_nu - 1, ], linewidth = 1,
               linetype = "22", na.rm = TRUE) +
@@ -55,8 +70,11 @@ plot_trend <- function(df, termen, jaren, relatief = TRUE, titel = NULL,
       title = titel, x = NULL, colour = NULL,
       y = if (relatief) "Documenten per 1.000 raadsdocumenten"
           else "Aantal documenten",
-      caption = if (met_lopend) {
-        sprintf("Open punt en stippellijn: %d is nog niet compleet.", jaar_nu)
+      caption = {
+        regels <- c(uitleg, if (met_lopend) {
+          sprintf("Open punt en gestippelde lijn: %d is nog niet compleet.", jaar_nu)
+        })
+        if (length(regels) > 0) paste(regels, collapse = "\n")
       }
     ) +
     thema_dashboard()

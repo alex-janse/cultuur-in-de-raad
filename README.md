@@ -23,17 +23,21 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
 
 ## Wat kun je ermee?
 
-- **Zoeken op thema's of eigen termen**: kies een themaset (zoals
-  *Cultuurparticipatie* of *Landelijke regelingen*) of typ zelf tot acht
-  termen of woordgroepen.
+- **Thema's en periodes**: kies een thema (zoals *Cultuurparticipatie* of
+  *Landelijke regelingen*) en een periode van vier jaar: een raadsperiode
+  (2014–2017, 2018–2021, 2022–2025, 2026–nu), een landelijke cultuurperiode
+  (2017–2020, 2021–2024, 2025–nu) of alle jaren (2010–nu). Alles is
+  voorberekend, dus direct beschikbaar. Vrij zoeken op eigen termen staat
+  voorlopig uit (zie [Technische opzet](#technische-opzet)).
 - **Kaart en ranking**: alle gemeenten ingekleurd naar aandacht, met een
   sorteerbare en doorzoekbare ranking. Maatstaven:
   - per 1.000 raadsdocumenten (corrigeert voor de omvang van het archief);
   - per 100.000 inwoners per jaar;
   - absoluut.
 - **Vergelijkbare gemeenten**: rang binnen de eigen grootteklasse.
-- **Trend**: aandacht per jaar, per term, voor maximaal vier gemeenten naast
-  heel Nederland.
+- **Trend**: aandacht per jaar sinds 2010, per term, voor maximaal vier
+  gemeenten naast heel Nederland. De gekozen periode, de coronaperiode en de
+  verkiezingen (of starts van landelijke cultuurperiodes) zijn gemarkeerd.
 - **Gemeenteprofiel**: kerncijfers, een korte samenvatting in gewone taal, de
   trend, de cultuurlasten per inwoner (2023–2026) en de nieuwste vermeldingen
   met de zin waarin de term staat.
@@ -41,7 +45,7 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
   er weinig aan uit, en omgekeerd?
 - **Uitleg**: een tabblad met de methode en kanttekeningen in gewone taal.
 - **Export en delen**: CSV (Excel-vriendelijk), PNG en een deelbare link die
-  de zoekopdracht bewaart.
+  thema, periode en keuzes bewaart.
 
 | Trend | Gemeenteprofiel |
 |---|---|
@@ -51,19 +55,29 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
 
 ## Technische opzet
 
-- **Live zoeken zonder de app te blokkeren**: zoekvragen aan de
-  Elasticsearch-API van OpenBesluitvorming lopen asynchroon
-  (`shiny::ExtendedTask` + `mirai`), zodat andere bezoekers door kunnen werken.
-- **Nachtelijke voorberekening**: een GitHub Action rekent de standaardvragen,
-  CBS-cijfers en gemeentegrenzen vooraf uit en zet ze op de tak
-  [`data`](../../tree/data). De app controleert inhoud, schemaversie en
-  leeftijd voordat ze die gebruikt, en valt anders terug op live ophalen.
+- **Geen live verzoeken aan de API**: de app gebruikt alleen voorberekende
+  data. Een trage of overbelaste API van OpenBesluitvorming raakt bezoekers
+  dus niet. Vrij zoeken (eigen termen, periode en opties) zit nog in de code
+  en gaat aan met `VRIJ_ZOEKEN <- TRUE` in `R/config.R`; die zoekvragen lopen
+  dan asynchroon (`shiny::ExtendedTask` + `mirai`).
+- **Nachtelijke voorberekening**: een GitHub Action rekent elk thema over alle
+  jaren uit (in delen van acht jaar, `PERIODE_DEEL_JAREN`, zodat elk verzoek
+  licht blijft voor de server), plus per gemeente de nieuwste vermeldingen
+  met fragment en per jaar de nieuwste documenten. De app telt de
+  periodeblokken daaruit op. Ook CBS-cijfers en gemeentegrenzen staan op de
+  tak [`data`](../../tree/data). De app controleert inhoud, schemaversie en
+  leeftijd voordat ze die gebruikt.
   CBS-cijfers en gemeentegrenzen worden alleen opnieuw gedownload als de bron
   een nieuwe versie heeft; de app toont wanneer CBS de cijfers bijwerkte.
   Een uitkomst die meer dan 20% afwijkt van de vorige wordt pas gepubliceerd
   als de volgende nacht hetzelfde geeft; wat mislukt, laat de vorige versie staan.
-- **Zuinig met de API**: caching op schijf, in het geheugen en per proces, en
-  een nette afhandeling van de verzoeklimiet (HTTP 429).
+- **Snel bij veel bezoekers**: getekende grafieken en kaartdata worden
+  gedeeld tussen bezoekers (`bindCache`), dus wie hetzelfde thema en dezelfde
+  periode bekijkt, krijgt ze direct.
+- **Zuinig met de API**: één nachtelijke run met pauzes tussen de verzoeken,
+  en een nette afhandeling van HTTP 429. Let op: een 429 kan ook betekenen dat
+  de server van OpenBesluitvorming geheugen tekortkomt
+  (`circuit_breaking_exception`); dan weigert hij alle verzoeken.
 - **Verantwoorde cijfers**: correctie voor archiefomvang en archiefdekking,
   een 95%-interval (exact Poisson) bij elke waarde, en geen rang bij te weinig
   treffers. Zie [Hoe wordt er geteld?](#hoe-wordt-er-geteld).
@@ -94,6 +108,11 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
     voor: in Utrecht (2024) hooguit ~2%.
   - De landelijke trend is de som van de gemeenten, zodat identieke stukken
     van verschillende gemeenten niet worden samengevoegd.
+  - De server telt unieke bestanden exact tot 3.000 per gemeente, jaar en term
+    (`PRECISIE_UNIEK`) en schat daarboven. Dat speelt alleen bij de
+    archiefomvang van grote steden. Gemeten (september 2026, tegenover een
+    grens van 40.000): de treffers zijn gelijk, de archiefomvang wijkt
+    hooguit 1% af. Een hogere grens kost de server veel meer geheugen.
 - **Alleen in cultuurcontext** (standaard aan): een term die zelf niet over
   cultuur gaat (zoals *talentontwikkeling*) telt alleen als binnen 15 woorden
   een cultuurwoord staat (cultuur, kunst, muziek, theater, museum, erfgoed,
@@ -135,14 +154,15 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
   fusiedatum. Heeft niet elke voorganger een archief (Voorne aan Zee: geen
   Hellevoetsluis), dan telt 'per 100.000 inwoners' alleen de jaren vanaf de
   fusie (`ONVOLLEDIGE_FUSIES` in `R/config.R`).
-- **Trend en totaal tellen net anders**: dubbele bijlagen worden in de trend
-  per jaar samengevoegd en in het totaal over de hele periode. Een bijlage
-  die in twee jaren wordt besproken telt in de trend dus twee keer (in de
-  praktijk tot ongeveer 6% verschil). Bij de grootste archieven (Amsterdam)
-  is het aantal unieke bijlagen een schatting met een marge van ongeveer 1%.
-- **Verzoeklimiet**: bij veel zoekvragen kort na elkaar geeft de API een
-  melding (HTTP 429). Probeer het dan ongeveer 10 minuten later opnieuw; de
-  standaardvragen en themasets zijn voorberekend en werken gewoon.
+- **Samenvoegen per jaar**: dubbele bijlagen worden per jaar samengevoegd; een
+  periode is de som van haar jaren. Een bijlage die in twee jaren van een
+  periode wordt besproken, telt dus twee keer (in de praktijk tot ongeveer 6%
+  verschil met samenvoegen over de hele periode).
+- **Vroege jaren**: vóór 2016 hebben minder gemeenten een archief (2010: 119,
+  2014: 217, vanaf 2019: ongeveer 280). Vergelijk daarom liefst binnen één
+  periode; de app deelt wel altijd alleen door de jaren met archief.
+- **Nieuwste vermeldingen**: het gemeenteprofiel toont de vijf nieuwste
+  vermeldingen uit alle jaren, niet alleen uit de gekozen periode.
 - **Aandacht is geen beleid**: een vermelding kan in een besluit staan, maar
   ook in een bijlage of een verworpen motie. Het gemeenteprofiel toont de
   zinnen, zodat je dat kunt nagaan.
@@ -183,16 +203,36 @@ Start daarna de app vanuit deze map:
 shiny::runApp()
 ```
 
-Bij het openen laadt direct de standaardzoekvraag. Andere termen, perioden of
-instellingen gaan live naar de API (ongeveer 15 seconden) en blijven daarna
-een uur in het geheugen.
+De app leest de voorberekende data van de tak `data` op GitHub; zonder die
+data (bijvoorbeeld vlak na een methodewijziging) meldt hij dat de gegevens
+nog niet beschikbaar zijn. Met `VRIJ_ZOEKEN <- TRUE` gaan eigen zoekvragen
+live naar de API (ongeveer 15 seconden) en blijven ze een uur in het
+geheugen.
 
 De nachtelijke voorberekening kun je ook zelf starten, via het tabblad
-*Actions* op GitHub (vink *CBS-cijfers en gemeentegrenzen opnieuw ophalen* aan om
-ook zonder nieuwe versie bij CBS te downloaden) of lokaal:
+*Actions* op GitHub of lokaal. Bij een handmatige run op GitHub kun je
+aanvinken:
+
+- *CBS-cijfers en gemeentegrenzen opnieuw ophalen*: ook zonder nieuwe versie
+  bij CBS downloaden;
+- *Oude zoekresultaten laten staan*: bij een nieuwe versie van de app met
+  andere sleutels. Start de run dan vóór het mergen op de nieuwe tak, zodat
+  de huidige app blijft werken tot de nieuwe online staat.
+
+Lokaal:
 
 ```sh
 Rscript scripts/voorbereken.R uitvoer
+```
+
+Schermafbeeldingen voor README en projectpagina opnieuw maken, en een
+loadtest met N gelijktijdige bezoekers tegen de online app. Beide gebruiken
+een headless Chrome (pakketten `chromote` en `callr`) en doen geen verzoeken
+aan de API van OpenBesluitvorming:
+
+```sh
+Rscript scripts/screenshots.R
+Rscript scripts/loadtest.R 1 5 10 20
 ```
 
 Tests draaien (zonder netwerk):
@@ -220,12 +260,12 @@ R/kaart.R          kaartopbouw
 R/plots.R          grafieken
 R/ranking.R        ranking met bandbreedte
 R/cache.R          schijf-, geheugen- en procescache
-R/voorberekend.R   nachtelijk voorberekende data lezen en controleren
-R/nachtrun.R       beslissingen van de nachtelijke run (bijwerken, afkeuren, opruimen)
+R/voorberekend.R   voorberekende data lezen en controleren, periodeblokken optellen
+R/nachtrun.R       nachtelijke run: bijwerken, afkeuren, opruimen, delen samenvoegen
 R/export.R         CSV-export
 R/namen.R          naamnormalisatie en opmaak
 R/uitleg.R         tabblad Uitleg
-scripts/           nachtelijke voorberekening en validatie
+scripts/           nachtelijke voorberekening, validatie, schermafbeeldingen en loadtest
 tests/testthat/    tests met vaste voorbeelden (fixtures)
 docs/              projectpagina (GitHub Pages) en screenshots
 .github/workflows/ tests en nachtelijke voorberekening

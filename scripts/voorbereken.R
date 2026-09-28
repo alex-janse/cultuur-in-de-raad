@@ -77,6 +77,10 @@ regel_van <- function(d, naam) {
   d[d$set == naam, , drop = FALSE]
 }
 
+# Zonder vrij zoeken: elk thema over alle jaren (de app telt de blokken
+# daaruit op), plus de voorbeelden die de app anders live zou ophalen
+periode <- if (VRIJ_ZOEKEN) standaard_periode() else volledige_periode()
+
 overzicht <- list()
 for (naam in names(voorberekende_sets())) {
   termen <- voorberekende_sets()[[naam]]
@@ -93,16 +97,44 @@ for (naam in names(voorberekende_sets())) {
 
   message("Zoekvraag ", naam, ": ", paste(termen, collapse = ", "))
   # Het resultaat bevat ook de trends van alle gemeenten
-  res <- probeer(naam, \() haal_data_op(termen, standaard_periode(), STANDAARD_OPTIES))
-  Sys.sleep(PAUZE)
+  res <- if (VRIJ_ZOEKEN) {
+    probeer(naam, \() haal_data_op(termen, periode, STANDAARD_OPTIES))
+  } else {
+    # Alle jaren in delen: kleinere verzoeken, minder geheugen op de server
+    delen <- list()
+    for (deel in periode_delen(periode)) {
+      uitkomst <- probeer(sprintf("%s %d-%d", naam, deel[1], deel[2]),
+                          \() haal_data_op(termen, deel, STANDAARD_OPTIES))
+      Sys.sleep(PAUZE)
+      if (is.null(uitkomst)) break
+      delen[[length(delen) + 1]] <- uitkomst
+    }
+    if (length(delen) == length(periode_delen(periode))) {
+      voeg_delen_samen(delen, periode)
+    }
+  }
+  if (VRIJ_ZOEKEN) Sys.sleep(PAUZE)
+  if (!is.null(res) && !VRIJ_ZOEKEN) {
+    voorbeelden <- probeer(paste(naam, "(voorbeelden)"),
+                           \() haal_voorbeelden(termen, periode, STANDAARD_OPTIES))
+    Sys.sleep(PAUZE)
+    # Zonder voorbeelden zou het profiel toch live moeten: dan liever de
+    # vorige versie laten staan
+    if (is.null(voorbeelden)) {
+      res <- NULL
+    } else {
+      res$fragmenten <- voorbeelden$fragmenten
+      res$docs_jaren <- voorbeelden$docs
+    }
+  }
 
   rij <- if (!is.null(res)) {
     data.frame(
       set = naam, termen = paste(termen, collapse = ", "),
-      periode = paste(standaard_periode(), collapse = "-"),
+      periode = paste(periode, collapse = "-"),
       documenten = res$totaal_docs, gemeenten = nrow(res$per_gemeente),
       methode = methode_versie(),
-      sleutel = zoek_sleutel(termen, standaard_periode(), STANDAARD_OPTIES),
+      sleutel = zoek_sleutel(termen, periode, STANDAARD_OPTIES),
       berekend_op = format(res$berekend_op, "%Y-%m-%d %H:%M %Z")
     )
   }
@@ -159,6 +191,12 @@ if (length(overzicht) > 0) {
   # Opruimen: zoekresultaten die niet (meer) in het overzicht staan, bv. na
   # een andere methode of periode, en Iv3-bestanden van oude keuzes
   oud <- op_te_ruimen(list.files(uitvoer), nieuw$sleutel)
+  # Bij een overgang naar een nieuwe versie van de app (OUDE_BEWAREN=true,
+  # handmatige run): de oude zoekresultaten laten staan, zodat de huidige app
+  # blijft werken tot de nieuwe online staat. De volgende run ruimt ze op.
+  if (identical(Sys.getenv("OUDE_BEWAREN"), "true")) {
+    oud <- setdiff(oud, grep("^zoek_", oud, value = TRUE))
+  }
   if (length(oud) > 0) {
     file.remove(file.path(uitvoer, oud))
     message("Opgeruimd: ", paste(oud, collapse = ", "))

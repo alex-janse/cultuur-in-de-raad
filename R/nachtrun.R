@@ -173,3 +173,39 @@ op_te_ruimen <- function(bestanden, sleutels, keuzes = IV3_KEUZES) {
   c(setdiff(zoek, sprintf("zoek_%s.rds", sleutels)),
     setdiff(iv3, sprintf("iv3_%s.rds", keuzes)))
 }
+
+# Een periode in delen voor de nachtelijke run: c(2010, 2026) met lengte 8
+# geeft 2010-2017, 2018-2025 en 2026-2026 (zie PERIODE_DEEL_JAREN)
+periode_delen <- function(jaren, lengte = PERIODE_DEEL_JAREN) {
+  begin <- seq(as.integer(jaren[1]), as.integer(jaren[2]), by = lengte)
+  lapply(begin, \(b) c(b, min(b + as.integer(lengte) - 1L, as.integer(jaren[2]))))
+}
+
+# De resultaten van de delen samenvoegen tot één resultaat over alle jaren.
+# De cijfers per jaar komen uit de delen; de totalen per gemeente worden
+# daaruit opnieuw opgeteld, net zoals de app een periodeblok maakt.
+voeg_delen_samen <- function(delen, jaren) {
+  vast <- bind_rows(lapply(delen, `[[`, "per_gemeente")) |>
+    select(key, any_of(c("ruw", "gemeentecode", "cbs_naam", "inwoners",
+                         "inwoners_jaar", "gemeente"))) |>
+    group_by(key) |>
+    summarise(ruw = list(unique(unlist(ruw))),
+              across(-ruw, first), .groups = "drop")
+  trends <- bind_rows(lapply(delen, `[[`, "trends"))
+
+  res <- delen[[length(delen)]]
+  res$trends <- trends
+  res$jaren_nl <- trends |>
+    group_by(jaar, term) |>
+    summarise(n = sum(n), archief = sum(archief), .groups = "drop")
+  res$per_gemeente <- vast
+  res$docs <- bind_rows(lapply(delen, `[[`, "docs")) |>
+    arrange(desc(datum)) |>
+    head(MAX_DOCS)
+  res$inwoners_ok <- all(vapply(delen, \(d) isTRUE(d$inwoners_ok), logical(1)))
+  res$jaren <- as.integer(jaren)
+
+  samen <- blok_resultaat(res, jaren)
+  samen$periode_volledig <- NULL
+  samen
+}

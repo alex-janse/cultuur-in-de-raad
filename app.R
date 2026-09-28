@@ -54,7 +54,9 @@ mark { background: #FFF3A3; padding: 0 2px; border-radius: 2px; }
 # Een live zoekvraag duurt 5-15 s. In een apart R-proces (mirai) blijft de
 # app intussen voor alle bezoekers bruikbaar. Met options(cultuur.async =
 # FALSE) draait alles in het hoofdproces (handig voor tests).
-ASYNC <- getOption("cultuur.async", TRUE)
+# Zonder vrij zoeken is er geen live werk: dan ook geen extra proces (scheelt
+# geheugen en opstarttijd).
+ASYNC <- VRIJ_ZOEKEN && getOption("cultuur.async", TRUE)
 if (ASYNC) {
   # Lukt het starten niet (bv. een host die geen extra processen toestaat),
   # dan zoekt de app gewoon in het hoofdproces, zoals voorheen.
@@ -108,37 +110,52 @@ ui <- function(request) {
         selectizeInput("ga_naar", "Ga naar gemeente", choices = NULL,
                        options = list(placeholder = "Typ een gemeentenaam…")),
         hr(),
-        selectInput("thema", "Thema",
-                    choices = c("— eigen keuze —" = "", names(THEMASETS))),
-        selectizeInput(
-          "termen", "Zoektermen",
-          choices = TERMEN,
-          selected = STANDAARD_TERMEN,
-          multiple = TRUE,
-          options = list(
-            create = TRUE, persist = TRUE, maxItems = MAX_TERMEN,
-            placeholder = "Kies of typ een term…",
-            plugins = list("remove_button")
+        if (VRIJ_ZOEKEN) {
+          tagList(
+            selectInput("thema", "Thema",
+                        choices = c("— eigen keuze —" = "", names(THEMASETS))),
+            selectizeInput(
+              "termen", "Zoektermen",
+              choices = TERMEN,
+              selected = STANDAARD_TERMEN,
+              multiple = TRUE,
+              options = list(
+                create = TRUE, persist = TRUE, maxItems = MAX_TERMEN,
+                placeholder = "Kies of typ een term…",
+                plugins = list("remove_button")
+              )
+            ),
+            helpText("Typ zelf een term of woordgroep (bijv. 'kunst en cultuur')",
+                     "en druk op Enter om hem toe te voegen."),
+            sliderInput("jaren", "Periode (vergaderdatum)",
+                        min = EERSTE_JAAR, max = huidig_jaar(),
+                        value = standaard_periode(), step = 1, sep = ""),
+            checkboxInput("opt_context", "Alleen in cultuurcontext",
+                          value = STANDAARD_OPTIES$context),
+            checkboxInput("opt_dedup", "Dubbele bijlagen samenvoegen",
+                          value = STANDAARD_OPTIES$dedup),
+            checkboxInput("opt_woordvormen", "Ook woordvormen (amateurkunst*)",
+                          value = STANDAARD_OPTIES$woordvormen),
+            helpText(sprintf(paste(
+              "Cultuurcontext: een term telt alleen als binnen %d woorden een",
+              "cultuurwoord staat (cultuur, kunst, muziek, theater, …). Geldt",
+              "niet voor termen die zelf al over cultuur gaan."), CONTEXT_AFSTAND)),
+            bslib::input_task_button("ophalen", "Zoeken",
+                                     label_busy = "Bezig met zoeken…",
+                                     class = "btn-primary", width = "100%")
           )
-        ),
-        helpText("Typ zelf een term of woordgroep (bijv. 'kunst en cultuur')",
-                 "en druk op Enter om hem toe te voegen."),
-        sliderInput("jaren", "Periode (vergaderdatum)",
-                    min = EERSTE_JAAR, max = huidig_jaar(),
-                    value = standaard_periode(), step = 1, sep = ""),
-        checkboxInput("opt_context", "Alleen in cultuurcontext",
-                      value = STANDAARD_OPTIES$context),
-        checkboxInput("opt_dedup", "Dubbele bijlagen samenvoegen",
-                      value = STANDAARD_OPTIES$dedup),
-        checkboxInput("opt_woordvormen", "Ook woordvormen (amateurkunst*)",
-                      value = STANDAARD_OPTIES$woordvormen),
-        helpText(sprintf(paste(
-          "Cultuurcontext: een term telt alleen als binnen %d woorden een",
-          "cultuurwoord staat (cultuur, kunst, muziek, theater, …). Geldt",
-          "niet voor termen die zelf al over cultuur gaan."), CONTEXT_AFSTAND)),
-        bslib::input_task_button("ophalen", "Zoeken",
-                                 label_busy = "Bezig met zoeken…",
-                                 class = "btn-primary", width = "100%"),
+        } else {
+          # Vaste thema's en periodes: alles voorberekend, direct beschikbaar
+          tagList(
+            selectInput("thema_vast", "Thema", choices = names(voorberekende_sets())),
+            uiOutput("thema_termen"),
+            selectInput("blok", "Periode", choices = PERIODES,
+                        selected = STANDAARD_BLOK),
+            helpText("Blokken van vier jaar: raadsperiodes (verkiezingen in",
+                     "2014, 2018, 2022 en 2026) of landelijke cultuurperiodes.",
+                     "De trendgrafiek toont alle jaren.")
+          )
+        },
         hr(),
         radioButtons("maatstaf", "Maatstaf", choices = MAATSTAVEN,
                      selected = "relatief"),
@@ -150,7 +167,8 @@ ui <- function(request) {
         hr(),
         uiOutput("status"),
         div(class = "knoppen",
-            bookmarkButton("Link naar deze zoekopdracht",
+            bookmarkButton(if (VRIJ_ZOEKEN) "Link naar deze zoekopdracht"
+                           else "Link naar deze weergave",
                            title = "Maak een link die deze instellingen bewaart")),
         hr(),
         helpText("Bronnen: OpenBesluitvorming.nl / Open Raadsinformatie,",
@@ -182,7 +200,7 @@ ui <- function(request) {
                     downloadButton("dl_ranking", "Ranking (CSV)"))),
             DT::DTOutput("tabel"),
             helpText(paste("Bandbreedte: 95%-interval; overlappen twee",
-                           "bandbreedtes, dan is het verschil niet betekenisvol.",
+                           "bandbreedtes sterk, dan is het verschil waarschijnlijk toeval.",
                            "Gemeenten met minder dan", MIN_TREFFERS_RANG,
                            "treffers krijgen geen rang. Klik op een kolomkop",
                            "om te sorteren."))
@@ -215,6 +233,7 @@ ui <- function(request) {
               column(5, plotOutput("profiel_budget", height = 400))
             ),
             h4("Waar gaat het over? De nieuwste vermeldingen"),
+            if (!VRIJ_ZOEKEN) helpText("Uit alle jaren, niet alleen de gekozen periode."),
             uiOutput("profiel_fragmenten")
           ),
           tabPanel(
@@ -443,6 +462,16 @@ server <- function(input, output, session) {
   wordt_hersteld <- FALSE
   onRestore(function(state) wordt_hersteld <<- TRUE)
   onRestored(function(state) {
+    # Vaste thema's: thema en periode komen als gewone invoer terug; alleen de
+    # gekozen gemeenten nog toepassen (nu, of zodra het resultaat er is)
+    if (!VRIJ_ZOEKEN) {
+      sel <- list(trend = unlist(state$values$trend),
+                  profiel = unlist(state$values$profiel))
+      res <- isolate(resultaat())
+      if (is.null(res)) wachtende_selectie(sel)
+      else verwerk_resultaat(res, sel$trend, sel$profiel)
+      return()
+    }
     zoek <- state$values$zoek
     # De link kan zijn aangepast: termen en jaren net zo controleren als invoer
     termen <- schoon_termen(unlist(zoek$termen))
@@ -483,10 +512,41 @@ server <- function(input, output, session) {
   # die is voorberekend en dus direct beschikbaar
   eerste_keer <- observe({
     eerste_keer$destroy()
-    if (!wordt_hersteld) {
+    if (VRIJ_ZOEKEN && !wordt_hersteld) {
       isolate(doe_ophalen(STANDAARD_TERMEN, standaard_periode(), STANDAARD_OPTIES))
     }
   })
+
+  # --- Vaste thema's en periodes (zonder vrij zoeken) ---
+
+  # Per thema het voorberekende resultaat over alle jaren (lees_voorberekend
+  # onthoudt het een uur); een periode kiezen is daarna alleen optellen.
+  # Geen enkel verzoek aan de API van OpenBesluitvorming.
+  thema_termen <- reactive({
+    req(isTRUE(input$thema_vast %in% names(voorberekende_sets())))
+    voorberekende_sets()[[input$thema_vast]]
+  })
+  output$thema_termen <- renderUI({
+    helpText("Termen:", paste(thema_termen(), collapse = ", "))
+  })
+  gekozen_blok <- reactive({
+    if (isTRUE(input$blok %in% unlist(PERIODES))) input$blok else STANDAARD_BLOK
+  })
+  if (!VRIJ_ZOEKEN) {
+    observeEvent(list(thema_termen(), gekozen_blok()), {
+      volledig <- zoek_voorberekend(thema_termen(), volledige_periode(),
+                                    STANDAARD_OPTIES)
+      if (is.null(volledig)) {
+        meld_fout(paste("De voorberekende gegevens zijn nu niet beschikbaar.",
+                        "Probeer het over een paar minuten opnieuw."))
+        return()
+      }
+      sel <- wachtende_selectie()
+      wachtende_selectie(list())
+      verwerk_resultaat(blok_resultaat(volledig, blok_jaren(gekozen_blok())),
+                        sel$trend, sel$profiel)
+    })
+  }
 
   # Themakeuze loslaten zodra de termen niet meer bij het thema passen
   observeEvent(input$termen, {
@@ -577,12 +637,17 @@ server <- function(input, output, session) {
     })
   })
 
-  observe({
-    grenzen <- grenzen()
-    req(grenzen)
+  # Kaartvlakken met waarden en labels; gedeeld tussen bezoekers (bindCache)
+  kaart_data <- reactive({
     res <- resultaat()
-    req(res)
-    kaart_df <- maak_kaart_df(grenzen, res$per_gemeente, maatstaf())
+    req(res, grenzen())
+    maak_kaart_df(grenzen(), res$per_gemeente, maatstaf())
+  }) |>
+    bindCache(resultaat_sleutel(), maatstaf(), !is.null(grenzen()))
+
+  observe({
+    req(grenzen(), resultaat())
+    kaart_df <- kaart_data()
     leafletProxy("kaart") |>
       clearShapes() |>
       clearControls() |>
@@ -693,6 +758,29 @@ server <- function(input, output, session) {
       mutate(gebied = rij$gemeente)
   }
 
+  # Zonder vrij zoeken toont de trend alle jaren, met de gekozen periode, de
+  # coronajaren en de verkiezingen of cultuurperiodes gemarkeerd
+  trend_jaren <- function(res) res$periode_volledig %||% res$jaren
+  trend_markering <- reactive({
+    res <- resultaat()
+    req(res)
+    if (VRIJ_ZOEKEN) return(NULL)
+    cultuur <- identical(blok_indeling(gekozen_blok()), "Landelijke cultuurperiodes")
+    list(blok = res$jaren, corona = CORONA,
+         lijnen = if (cultuur) CULTUURPERIODE_START else VERKIEZINGSJAREN,
+         lijn_uitleg = if (cultuur) "start van een landelijke cultuurperiode"
+                       else "gemeenteraadsverkiezingen")
+  })
+
+  # Getekende grafieken worden gedeeld tussen bezoekers (bindCache): wie
+  # hetzelfde thema, dezelfde periode en keuzes bekijkt, krijgt ze direct.
+  # De datum zit in de sleutel, zodat nieuwe nachtelijke cijfers doorkomen.
+  resultaat_sleutel <- reactive({
+    res <- resultaat()
+    req(res)
+    list(res$termen, res$jaren, res$opties, res$berekend_op, Sys.Date())
+  })
+
   trend_plot <- reactive({
     res <- resultaat()
     req(res, length(input$trend_gebieden) > 0)
@@ -700,10 +788,11 @@ server <- function(input, output, session) {
     shiny::validate(need(nrow(df) > 0 && any(df$n > 0),
                          "Geen treffers in deze periode."))
     df$gebied <- factor(df$gebied, levels = unique(df$gebied))
-    plot_trend(df, res$termen, res$jaren,
+    plot_trend(df, res$termen, trend_jaren(res),
                relatief = maatstaf() != "absoluut",
                titel = sprintf("Aandacht voor %s",
-                               paste(res$termen, collapse = ", ")))
+                               paste(res$termen, collapse = ", ")),
+               markering = trend_markering())
   })
 
   output$trend <- renderPlot(trend_plot(), alt = reactive({
@@ -711,9 +800,10 @@ server <- function(input, output, session) {
     req(res)
     sprintf(paste("Lijngrafieken per zoekterm (%s) met de aandacht per jaar",
                   "van %d tot en met %d voor: %s."),
-            paste(res$termen, collapse = ", "), res$jaren[1], res$jaren[2],
+            paste(res$termen, collapse = ", "), trend_jaren(res)[1], trend_jaren(res)[2],
             paste(namen_van(input$trend_gebieden, res), collapse = ", "))
-  }))
+  })) |>
+    bindCache(resultaat_sleutel(), maatstaf(), input$trend_gebieden, trend_markering())
 
   output$dl_trend <- downloadHandler(
     filename = \() sprintf("cultuur-trend-%s.png", Sys.Date()),
@@ -812,8 +902,13 @@ server <- function(input, output, session) {
   output$profiel_verhaal <- renderUI({
     rij <- profiel_rij()
     res <- resultaat()
+    # De richting van de trend binnen de gekozen periode
+    trend <- trend_voor(rij$key, res)
+    if (!is.null(trend)) {
+      trend <- trend |> filter(jaar >= res$jaren[1], jaar <= res$jaren[2])
+    }
     zinnen <- verhaal_gemeente(
-      rij, res$per_gemeente, trend_voor(rij$key, res),
+      rij, res$per_gemeente, trend,
       budget = lasten_voor(IV3_KEUZES[[1]]),
       budget_label = names(IV3_KEUZES)[1]
     )
@@ -828,12 +923,15 @@ server <- function(input, output, session) {
     shiny::validate(need(nrow(df) > 0, "Geen trendgegevens."))
     df$gebied <- factor(df$gebied, levels = unique(df$gebied))
     # Alleen het totaal van de gekozen termen: past beter in de halve breedte
-    plot_trend(df, res$termen, res$jaren,
+    plot_trend(df, res$termen, trend_jaren(res),
                relatief = maatstaf() != "absoluut",
-               titel = "Aandacht door de jaren", alleen_totaal = TRUE)
+               titel = "Aandacht door de jaren", alleen_totaal = TRUE,
+               markering = trend_markering())
   }, alt = reactive(sprintf(
     "Lijngrafiek: aandacht per jaar in %s naast heel Nederland.",
-    profiel_rij()$gemeente)))
+    profiel_rij()$gemeente))) |>
+    bindCache(resultaat_sleutel(), maatstaf(), input$profiel_gemeente,
+              trend_markering())
 
   output$profiel_budget <- renderPlot({
     rij <- profiel_rij()
@@ -846,7 +944,8 @@ server <- function(input, output, session) {
     plot_budget_trend(lasten, rij$gemeentecode, rij$gemeente)
   }, alt = reactive(sprintf(
     "Staafdiagram: lasten voor cultuur per inwoner in %s naast de mediaan van alle gemeenten, 2023 tot en met 2026.",
-    profiel_rij()$gemeente)))
+    profiel_rij()$gemeente))) |>
+    bindCache(input$profiel_gemeente, input$tabs == "profiel", Sys.Date())
 
   # Fragmenten: een verzoek aan de API per gemeente. Op de achtergrond (net
   # als live zoeken), zodat een trage API de app niet voor iedereen
@@ -864,6 +963,15 @@ server <- function(input, output, session) {
     req(input$tabs == "profiel")
     rij <- profiel_rij()
     res <- resultaat()
+    if (!VRIJ_ZOEKEN) {
+      frag <- res$fragmenten
+      frag_uitkomst(if (is.null(frag)) {
+        list(key = rij$key, fout = "niet voorberekend")
+      } else {
+        list(key = rij$key, frag = frag[frag$key == rij$key, ])
+      })
+      return()
+    }
     if (!is.null(blokkade_tot())) {
       frag_uitkomst(list(key = rij$key,
                          fout = tryCatch(blokkade_fout(), error = conditionMessage)))
@@ -956,7 +1064,8 @@ server <- function(input, output, session) {
   output$budget_plot <- renderPlot(budget_plot(), alt = reactive(sprintf(paste(
     "Spreidingsdiagram van %d gemeenten: cultuurlasten per inwoner tegen de",
     "aandacht in de raad, ingedeeld in vier profielen. De tabel hieronder",
-    "toont de grootste verschillen."), nrow(budget_df()))))
+    "toont de grootste verschillen."), nrow(budget_df())))) |>
+    bindCache(resultaat_sleutel(), budget_keuze(), maatstaf())
 
   output$budget_bron <- renderUI({
     req(budget_keuze())
