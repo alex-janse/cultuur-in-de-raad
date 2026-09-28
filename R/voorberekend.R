@@ -140,17 +140,44 @@ haal_resultaat <- function(termen, jaren, opties) {
   }
 }
 
-# Voor de nachtelijke run: is CBS onbereikbaar, dan de inwoners van de vorige
-# run (uit de uitvoermap) in de schijfcache zetten. haal_inwoners() en dus de
-# zoekvragen gebruiken die dan, in plaats van een lege tabel zonder
-# gemeentecodes. Geeft TRUE als er een vorige versie was.
-herstel_vorige_inwoners <- function(uitvoer) {
-  vorig <- file.path(uitvoer, "cbs_inwoners.rds")
-  if (!file.exists(vorig)) return(FALSE)
+# Voor de nachtelijke run: de inwoners uit de uitvoermap (nieuw opgehaald, of
+# van een vorige run als CBS niet gewijzigd of onbereikbaar is) in de
+# schijfcache zetten. haal_inwoners() en dus de zoekvragen gebruiken die dan,
+# in plaats van CBS opnieuw te vragen of een lege tabel zonder gemeentecodes.
+# Geeft TRUE als er inwoners waren.
+inwoners_naar_cache <- function(uitvoer) {
+  pad <- file.path(uitvoer, "cbs_inwoners.rds")
+  if (!file.exists(pad)) return(FALSE)
   dir.create(cache_map(), showWarnings = FALSE, recursive = TRUE)
   # copy.date = FALSE: een verse wijzigingsdatum, anders geldt de cache als verlopen
-  file.copy(vorig, file.path(cache_map(), "cbs_inwoners.rds"),
+  file.copy(pad, file.path(cache_map(), "cbs_inwoners.rds"),
             overwrite = TRUE, copy.date = FALSE)
+}
+
+# Welke versie van de CBS-tabellen en gemeentegrenzen de nachtelijke run
+# gebruikt (zie scripts/voorbereken.R). Kolommen: onderdeel, versie,
+# bron_datum (laatste wijziging bij CBS), opgehaald en gecontroleerd.
+leeg_bronversies <- function() {
+  data.frame(onderdeel = character(), versie = character(),
+             bron_datum = character(), opgehaald = character(),
+             gecontroleerd = character())
+}
+
+# Korte bronregel voor in de app, of NULL als er geen versie bekend is (bv.
+# als de app live ophaalt). Meldt het ook als CBS al een paar dagen niet te
+# controleren was.
+bron_regel <- function(versies, onderdeel, label, vandaag = Sys.Date()) {
+  if (!is.data.frame(versies)) return(NULL)
+  v <- versies[versies$onderdeel == onderdeel, , drop = FALSE]
+  if (nrow(v) != 1 || is.na(v$bron_datum)) return(NULL)
+  datum <- \(x) format(as.Date(x), "%d-%m-%Y")
+  tekst <- sprintf("%s, bijgewerkt door CBS op %s", label, datum(v$bron_datum))
+  if (!is.na(v$gecontroleerd) &&
+      as.Date(v$gecontroleerd) < vandaag - WAARSCHUW_LEEFTIJD_DAGEN) {
+    tekst <- sprintf("%s (CBS was sinds %s niet bereikbaar om op nieuwe cijfers te controleren)",
+                     tekst, datum(v$gecontroleerd))
+  }
+  tekst
 }
 
 # Leeftijd van voorberekende data in dagen (voor een waarschuwing)

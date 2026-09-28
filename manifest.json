@@ -2682,7 +2682,7 @@
   },
   "files": {
     "app.R": {
-      "checksum": "218816a8c0d980c0050b7ad213af98d7"
+      "checksum": "f9edd5fa6c6c9a89b4aaf27f478b4cc3"
     },
     "R/00_pakketten.R": {
       "checksum": "8cbd0326cdeca71d715fdbac31aa17ab"
@@ -2694,16 +2694,16 @@
       "checksum": "fcd37db882e6337b953ea97caee28856"
     },
     "R/cbs.R": {
-      "checksum": "2045d7716a2e7eccf13842aeaf9ef38d"
+      "checksum": "12ef0f92296ee728f9d10c94551ffe3d"
     },
     "R/config.R": {
-      "checksum": "c0f203baceadcb932d499b7740d994ee"
+      "checksum": "dc95c24e01130570c7eb34d928830ee8"
     },
     "R/export.R": {
       "checksum": "2f4d14fa8953d8afd0372618e00fc01c"
     },
     "R/geo.R": {
-      "checksum": "445c2a45ea1c9249bb1253f098a5f312"
+      "checksum": "0f27d3ecc433e2c88f7e03077104add6"
     },
     "R/kaart.R": {
       "checksum": "1d0f3f952f0d96573ddab4f6cb39a866"
@@ -2721,7 +2721,7 @@
       "checksum": "00a5fa4ef2473d5cfe8516ef44391f80"
     },
     "R/voorberekend.R": {
-      "checksum": "34007097ec66faf16caa1db573ac0ec2"
+      "checksum": "649f5bf3d3f5349f7b41d4854a9584a6"
     }
   },
   "users": null

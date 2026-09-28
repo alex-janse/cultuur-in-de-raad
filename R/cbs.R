@@ -70,7 +70,7 @@ haal_cultuurlasten <- function(keuze = "2024_rekening") {
 
     inw_jaar <- min(jaar, huidig_jaar() - 1)
     inwoners <- cbs_get_data(
-      "03759ned", Perioden = paste0(inw_jaar, "JJ00"), Geslacht = "T001038",
+      CBS_TABEL_BEVOLKING_IV3, Perioden = paste0(inw_jaar, "JJ00"), Geslacht = "T001038",
       Leeftijd = "10000", BurgerlijkeStaat = "T001019",
       RegioS = has_substring("GM")
     ) |>
@@ -89,4 +89,37 @@ haal_cultuurlasten <- function(keuze = "2024_rekening") {
                                          lasten_keur * 1000 / inwoners_iv3,
                                          NA_real_))
   })
+}
+
+# --- CBS: is er iets nieuws? --------------------------------------------------
+
+# Datum (jjjj-mm-dd) waarop CBS een tabel voor het laatst heeft gewijzigd. Een
+# klein verzoek; zo downloadt de nachtelijke run alleen als er iets nieuws is.
+cbs_gewijzigd <- function(tabel, basis = "https://opendata.cbs.nl") {
+  js <- request(sprintf("%s/ODataApi/odata/%s/TableInfos", basis, tabel)) |>
+    req_url_query(`$select` = "Modified") |>
+    req_headers(Accept = "application/json") |>
+    req_timeout(30) |>
+    req_perform() |>
+    resp_body_json(simplifyVector = TRUE)
+  datum <- js$value$Modified
+  if (length(datum) != 1 || is.na(datum)) {
+    stop("CBS gaf geen wijzigingsdatum voor tabel ", tabel)
+  }
+  substr(datum, 1, 10)
+}
+
+# Versie van een onderdeel ("inwoners" of een Iv3-keuze): de wijzigingsdatum
+# van elke tabel die het gebruikt. bron_datum is die van de hoofdtabel.
+cbs_versie <- function(onderdeel) {
+  tabellen <- if (onderdeel == "inwoners") {
+    list(c(CBS_TABEL_BEVOLKING, "https://opendata.cbs.nl"))
+  } else {
+    jaar <- strsplit(onderdeel, "_")[[1]][1]
+    list(c(IV3_TABELLEN[[jaar]], "https://dataderden.cbs.nl"),
+         c(CBS_TABEL_BEVOLKING_IV3, "https://opendata.cbs.nl"))
+  }
+  data <- vapply(tabellen, \(t) cbs_gewijzigd(t[1], t[2]), character(1))
+  list(versie = paste(vapply(tabellen, `[`, "", 1), data, collapse = ", "),
+       bron_datum = data[1])
 }

@@ -5,6 +5,7 @@
 # Schrijft naar de uitvoermap:
 #   zoek_<sleutel>.rds    resultaat per standaardzoekvraag, incl. trends
 #   cbs_inwoners.rds, iv3_<keuze>.rds, gemeentegrenzen.rds
+#   bronversies.rds       welke versie van CBS en PDOK daarin zit
 #   overzicht.csv         wat er is berekend en wanneer
 # Mislukt een onderdeel, dan blijft de vorige versie in de uitvoermap staan.
 # =============================================================================
@@ -53,28 +54,67 @@ bewaar <- function(data, bestand) {
 
 # --- CBS en gemeentegrenzen ---------------------------------------------------
 
-message("CBS-inwoners")
-inw <- probeer("inwoners", haal_inwoners)
-if (is.null(inw)) {
-  mislukt <- c(mislukt, "inwoners")
-  # De zoekvragen koppelen archieven aan gemeenten via deze inwoners; zonder
-  # zouden ze zonder gemeentecodes (kaart, per inwoner) worden gepubliceerd
-  if (herstel_vorige_inwoners(uitvoer)) {
-    message("  zoekvragen gebruiken de inwoners van de vorige run")
+# Deze bronnen veranderen een paar keer per jaar. Elke nacht wordt alleen
+# gecontroleerd of er een nieuwe versie is (een klein verzoek per tabel); pas
+# dan wordt er gedownload. CBS_OPNIEUW=true (handmatige run) haalt alles op.
+# Is de bron onbereikbaar bij de controle, dan blijft de vorige versie staan:
+# een waarschuwing, geen fout.
+forceer <- identical(Sys.getenv("CBS_OPNIEUW"), "true")
+versies_pad <- file.path(uitvoer, "bronversies.rds")
+versies <- if (file.exists(versies_pad)) readRDS(versies_pad) else leeg_bronversies()
+waarschuwingen <- character()
+vandaag <- format(Sys.Date())
+
+werk_bij <- function(onderdeel, bestand, versie_fn, haal_fn) {
+  message(onderdeel)
+  pad <- file.path(uitvoer, bestand)
+  rij <- which(versies$onderdeel == onderdeel)
+  nieuw <- probeer(paste(onderdeel, "(controle)"), versie_fn, pogingen = 2)
+  if (is.null(nieuw)) {
+    if (file.exists(pad)) {
+      waarschuwingen <<- c(waarschuwingen, onderdeel)
+      message("  niet te controleren; de vorige versie blijft staan")
+      return(invisible(FALSE))
+    }
+    nieuw <- list(versie = NA_character_, bron_datum = NA_character_)
+  } else if (length(rij) == 1) {
+    versies$gecontroleerd[rij] <<- vandaag
+    if (!forceer && file.exists(pad) && identical(versies$versie[rij], nieuw$versie)) {
+      message(sprintf("  ongewijzigd (%s)", nieuw$versie))
+      return(invisible(FALSE))
+    }
   }
-} else {
-  bewaar(inw, "cbs_inwoners.rds")
+
+  data <- probeer(onderdeel, haal_fn)
+  if (is.null(data)) {
+    mislukt <<- c(mislukt, onderdeel)
+    return(invisible(FALSE))
+  }
+  bewaar(data, bestand)
+  regel <- data.frame(onderdeel = onderdeel, versie = nieuw$versie,
+                      bron_datum = nieuw$bron_datum, opgehaald = vandaag,
+                      gecontroleerd = if (is.na(nieuw$versie)) NA_character_ else vandaag)
+  versies <<- rbind(versies[versies$onderdeel != onderdeel, , drop = FALSE], regel)
+  invisible(TRUE)
 }
+
+werk_bij("inwoners", "cbs_inwoners.rds", \() cbs_versie("inwoners"), haal_inwoners)
+# De zoekvragen koppelen archieven aan gemeenten via deze inwoners; zonder
+# zouden ze zonder gemeentecodes (kaart, per inwoner) worden gepubliceerd
+if (!inwoners_naar_cache(uitvoer)) message("  geen CBS-inwoners beschikbaar")
 
 for (keuze in IV3_KEUZES) {
-  message("CBS Iv3 ", keuze)
-  d <- probeer(keuze, \() haal_cultuurlasten(keuze))
-  if (is.null(d)) mislukt <- c(mislukt, keuze) else bewaar(d, sprintf("iv3_%s.rds", keuze))
+  werk_bij(keuze, sprintf("iv3_%s.rds", keuze), \() cbs_versie(keuze),
+           \() haal_cultuurlasten(keuze))
 }
 
-message("Gemeentegrenzen")
-g <- probeer("grenzen", haal_gemeentegrenzen)
-if (is.null(g)) mislukt <- c(mislukt, "grenzen") else bewaar(g, "gemeentegrenzen.rds")
+werk_bij("grenzen", "gemeentegrenzen.rds",
+         \() list(versie = paste("PDOK", grenzen_jaar()), bron_datum = NA_character_),
+         haal_gemeentegrenzen)
+
+# Alleen versies van onderdelen die nog bestaan (bv. niet een oud Iv3-jaar)
+versies <- versies[versies$onderdeel %in% c("inwoners", IV3_KEUZES, "grenzen"), ]
+saveRDS(versies, versies_pad)
 
 
 # --- Standaardzoekvragen ----------------------------------------------------
@@ -169,6 +209,15 @@ if (length(overzicht) > 0) {
 
 # mislukt.txt laat de workflow na het publiceren rood worden, zodat een
 # gedeeltelijke mislukking opvalt (de geslaagde delen zijn dan wél bijgewerkt)
+waarschuwing_pad <- file.path(uitvoer, "..", "niet_gecontroleerd.txt")
+if (length(waarschuwingen) > 0) {
+  message("Niet te controleren (vorige versie blijft): ",
+          paste(waarschuwingen, collapse = "; "))
+  writeLines(waarschuwingen, waarschuwing_pad)
+} else if (file.exists(waarschuwing_pad)) {
+  file.remove(waarschuwing_pad)
+}
+
 mislukt_pad <- file.path(uitvoer, "..", "mislukt.txt")
 if (length(mislukt) > 0) {
   message("Mislukt of niet bijgewerkt: ", paste(mislukt, collapse = "; "))
