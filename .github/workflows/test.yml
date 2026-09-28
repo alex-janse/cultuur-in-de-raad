@@ -21,6 +21,18 @@ jobs:
           r-version: "4.6.1"
           use-public-rspm: true
 
+      # Pakketten bewaren tussen runs: voor R 4.6.1 moet o.a. s2 (voor sf) anders
+      # elke keer vanaf de broncode worden gebouwd (~7 min). Eén keer per maand
+      # vers installeren, zodat updates doorkomen.
+      - name: Maand bepalen (voor de pakketcache)
+        id: datum
+        run: echo "maand=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-pakketten-${{ runner.os }}-4.6.1-${{ hashFiles('.github/workflows/test.yml') }}-${{ steps.datum.outputs.maand }}
+
       - name: Systeembibliotheken voor sf
         run: |
           sudo apt-get update -q
@@ -28,7 +40,7 @@ jobs:
 
       - name: R-pakketten installeren
         run: |
-          Rscript -e 'install.packages(c("shiny", "bslib", "httr2", "jsonlite", "dplyr", "tidyr", "leaflet", "ggplot2", "ggrepel", "cbsodataR", "sf", "cachem", "rlang", "mirai", "DT", "testthat", "withr"))'
+          Rscript -e 'p <- c("shiny", "bslib", "httr2", "jsonlite", "dplyr", "tidyr", "leaflet", "ggplot2", "ggrepel", "cbsodataR", "sf", "cachem", "rlang", "mirai", "DT", "testthat", "withr"); nieuw <- p[!vapply(p, requireNamespace, logical(1), quietly = TRUE)]; if (length(nieuw) > 0) install.packages(nieuw)'
 
       - name: Tests
         run: Rscript -e 'testthat::test_dir("tests/testthat", stop_on_failure = TRUE)'
