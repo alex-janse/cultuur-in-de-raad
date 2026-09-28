@@ -38,6 +38,11 @@ fmt <- function(x, digits = 1) {
 # Zoektermen van de gebruiker: kleine letters, alleen letters, cijfers,
 # spaties, koppel- en apostroftekens; minimaal 2 tekens, geen dubbelen,
 # hooguit MAX_TERMEN (elke term maakt de zoekvraag zwaarder).
+# Kolom met de treffers van een term in per_gemeente. Termen bevatten geen
+# '_' (zie schoon_termen), dus dit botst nooit met een andere kolom, ook niet
+# bij een zoekterm als "gemeente" of "totaal".
+term_kolom <- function(termen) paste0("n_", termen)
+
 schoon_termen <- function(termen) {
   termen <- gsub("[^[:alnum:] '-]", "", tolower(trimws(termen)))
   termen <- unique(gsub("\\s+", " ", trimws(termen)))

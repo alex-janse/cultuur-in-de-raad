@@ -24,7 +24,9 @@ context_nodig <- function(term, opties) {
 }
 
 term_query <- function(term, opties = STANDAARD_OPTIES) {
-  enkel_woord <- !grepl("\\s", term)
+  # Woordvormen alleen voor één los woord: een prefix of wildcard wordt niet
+  # in woorden gesplitst, dus 'cultuur-educatie*' zou nooit iets vinden
+  enkel_woord <- grepl("^[[:alnum:]]+$", term)
   woordvorm <- isTRUE(opties$woordvormen) && enkel_woord &&
     nchar(term) >= MIN_TEKENS_WOORDVORMEN
 
@@ -219,18 +221,23 @@ parse_jaren <- function(buckets, termen, dedup = FALSE) {
 
 # --- Dekking en onzekerheid ---------------------------------------------------
 
-# Per gemeente: vanaf welk jaar er een archief is, en over hoeveel jaren er
-# in de gekozen periode echt documenten zijn. Een jaar telt als het minstens
-# MIN_DOCS_DEKKING documenten heeft; het lopende jaar telt naar rato mee.
-# Zo worden gemeenten die later instromen niet benadeeld.
+# Per gemeente: vanaf welk jaar er een archief is, over hoeveel jaren er in
+# de gekozen periode echt documenten zijn, en hoeveel treffers in die jaren
+# vallen. Een jaar telt als het minstens MIN_DOCS_DEKKING documenten heeft;
+# het lopende jaar telt naar rato mee. Zo worden gemeenten die later
+# instromen niet benadeeld. Bij een fusie waarvan niet elke voorganger een
+# archief heeft (ONVOLLEDIGE_FUSIES) tellen alleen de jaren vanaf de fusie:
+# daarvoor ontbreekt een deel van de gemeente, maar niet van de inwoners.
 dekking_per_gemeente <- function(trends, vandaag = Sys.Date()) {
   jaar_nu <- as.integer(format(vandaag, "%Y"))
   fractie_nu <- as.numeric(format(vandaag, "%j")) / 365
   trends |>
     filter(term == "__alle__", archief >= MIN_DOCS_DEKKING) |>
+    filter(is.na(ONVOLLEDIGE_FUSIES[key]) | jaar >= ONVOLLEDIGE_FUSIES[key]) |>
     group_by(key) |>
     summarise(eerste_jaar = min(jaar),
               jaren_dekking = sum(ifelse(jaar == jaar_nu, fractie_nu, 1)),
+              treffers_dekking = sum(n),
               .groups = "drop")
 }
 
@@ -251,11 +258,16 @@ poisson_interval <- function(n, noemer, schaal) {
 }
 
 # Maatstaven per gemeente: per 1.000 raadsdocumenten en per 100.000
-# inwoners per jaar (over de jaren met dekking), met bandbreedte.
-bereken_maatstaven <- function(per_gemeente) {
+# inwoners per jaar (treffers en jaren met dekking), met bandbreedte.
+# min_dekking: zoveel jaar archief is nodig, bij een periode van alleen het
+# lopende jaar minder dan 1 (anders zou alles NA zijn).
+bereken_maatstaven <- function(per_gemeente, min_dekking = 1) {
+  if (!"treffers_dekking" %in% names(per_gemeente)) {
+    per_gemeente$treffers_dekking <- per_gemeente$totaal
+  }
   per_gemeente |>
     mutate(
-      genoeg_archief = !is.na(jaren_dekking) & jaren_dekking >= 1 &
+      genoeg_archief = !is.na(jaren_dekking) & jaren_dekking >= min_dekking &
         archief >= MIN_DOCS_PER_JAAR * jaren_dekking,
       per_1000 = ifelse(genoeg_archief, 1000 * totaal / archief, NA_real_),
       per_1000_laag = ifelse(genoeg_archief,
@@ -264,12 +276,12 @@ bereken_maatstaven <- function(per_gemeente) {
                              poisson_interval(totaal, archief, 1000)$hoog, NA_real_),
       genoeg_inwoners = genoeg_archief & !is.na(inwoners) & inwoners >= MIN_INWONERS,
       per_100k = ifelse(genoeg_inwoners,
-                        1e5 * totaal / inwoners / jaren_dekking, NA_real_),
+                        1e5 * treffers_dekking / inwoners / jaren_dekking, NA_real_),
       per_100k_laag = ifelse(genoeg_inwoners,
-                             poisson_interval(totaal, inwoners * jaren_dekking, 1e5)$laag,
+                             poisson_interval(treffers_dekking, inwoners * jaren_dekking, 1e5)$laag,
                              NA_real_),
       per_100k_hoog = ifelse(genoeg_inwoners,
-                             poisson_interval(totaal, inwoners * jaren_dekking, 1e5)$hoog,
+                             poisson_interval(treffers_dekking, inwoners * jaren_dekking, 1e5)$hoog,
                              NA_real_),
       # Te weinig treffers voor een betekenisvolle plek in de ranking
       weinig_treffers = totaal < MIN_TREFFERS_RANG
@@ -310,7 +322,8 @@ haal_data_op <- function(termen, jaren, opties = STANDAARD_OPTIES) {
     key <- ruw_naar_key(ruw)
     list(
       totaal = tibble(key = key, ruw = ruw, archief = tel(b, opties$dedup),
-                      totaal = n[["__alle__"]], !!!as.list(n[termen])),
+                      totaal = n[["__alle__"]],
+                      !!!setNames(as.list(n[termen]), term_kolom(termen))),
       trend = parse_jaren(b$jaren$buckets, termen, opties$dedup) |>
         mutate(key = key)
     )
@@ -323,7 +336,7 @@ haal_data_op <- function(termen, jaren, opties = STANDAARD_OPTIES) {
   per_gemeente <- bind_rows(lapply(per_index, `[[`, "totaal")) |>
     group_by(key) |>
     summarise(ruw = list(unique(ruw)),
-              across(c(archief, totaal, all_of(termen)), sum),
+              across(c(archief, totaal, all_of(term_kolom(termen))), sum),
               .groups = "drop")
 
   inwoners <- tryCatch(haal_inwoners(), error = function(e) {
@@ -337,7 +350,7 @@ haal_data_op <- function(termen, jaren, opties = STANDAARD_OPTIES) {
     left_join(dekking_per_gemeente(trends), by = "key") |>
     left_join(inwoners, by = "key") |>
     mutate(gemeente = coalesce(cbs_naam, nette_naam(key))) |>
-    bereken_maatstaven() |>
+    bereken_maatstaven(min_dekking = min(1, periode_jaren(jaren))) |>
     arrange(desc(totaal))
 
   docs <- bind_rows(lapply(json$hits$hits, function(h) {

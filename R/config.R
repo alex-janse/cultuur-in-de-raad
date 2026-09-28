@@ -20,7 +20,7 @@ standaard_periode <- function() c(STANDAARD_BEGINJAAR, huidig_jaar())
 # Versies van de voorberekende data. SCHEMA_VERSIE ophogen bij een andere
 # structuur van het resultaat; de methode-versie volgt automatisch uit de
 # instellingen die de telling bepalen (zie methode_versie() onderaan).
-SCHEMA_VERSIE <- 2L   # 2: trends per gemeente, dekking en bandbreedtes
+SCHEMA_VERSIE <- 3L   # 2: trends per gemeente, dekking en bandbreedtes; 3: termkolommen n_<term>
 # Voorberekende data ouder dan dit wordt niet meer gebruikt (dan live)
 MAX_LEEFTIJD_DAGEN <- 7
 WAARSCHUW_LEEFTIJD_DAGEN <- 2
@@ -121,7 +121,7 @@ CULTUURWOORDEN <- c(
   "muzieklessen", "muziekschool", "muziekonderwijs", "theater", "theaters",
   "museum", "musea", "dans", "podium", "podiumkunsten", "erfgoed",
   "amateurkunst", "cultuureducatie", "cultuurparticipatie", "cultuurcoach",
-  "cultuurcoaches", "creatief", "creatieve"
+  "cultuurcoaches", "creatief", "creatieve", "bibliotheek", "bibliotheken"
 )
 # Termen die zelf al over cultuur gaan krijgen geen extra contexteis: een
 # cultuurwoord, of een woord dat met een cultuurstam begint (cultuureducatie,
@@ -163,6 +163,13 @@ FUSIES <- c(
   binnenmaas = "hoeksche_waard"              # 2019
 )
 
+# Fusies waarvan niet elke voorganger een archief heeft, met het fusiejaar.
+# Daarvoor ontbreekt een deel van de gemeente in het archief, maar niet in de
+# inwoners; 'per 100.000 inwoners' telt daarom alleen de jaren vanaf de fusie.
+ONVOLLEDIGE_FUSIES <- c(
+  voorne_aan_zee = 2023L                     # Hellevoetsluis zonder archief
+)
+
 # --- CBS: gemeentelijke lasten voor cultuur (Iv3) -----------------------------
 
 # "Gemeenten <jaar> onbewerkte Iv3-data" staan niet in de StatLine-catalogus
@@ -181,9 +188,23 @@ IV3_TAAKVELDEN <- c("5.3", "5.4", "5.5", "5.6")   # cultuur, musea, erfgoed, med
 # (bv. een cultuurwoord erbij), dan horen voorberekende resultaten niet meer
 # bij de app en worden ze niet gebruikt.
 methode_versie <- function() {
-  substr(rlang::hash(list(
+  substr(stabiele_hash(list(
     CULTUURWOORDEN, CONTEXT_AFSTAND, CULTUUR_STAMMEN, GEEN_CULTUUR,
     MIN_DOCS_DEKKING, MIN_TREFFERS_RANG, MIN_DOCS_PER_JAAR,
-    MIN_INWONERS, FUSIES, CBS_NAAM_NAAR_KEY, MIN_TEKENS_WOORDVORMEN
+    MIN_INWONERS, FUSIES, ONVOLLEDIGE_FUSIES, CBS_NAAM_NAAR_KEY,
+    MIN_TEKENS_WOORDVORMEN, VELDEN
   )), 1, 8)
 }
+
+# Hash van een tekstweergave, zodat de nachtelijke run en de app dezelfde
+# sleutel maken, ook met een andere R-versie (rlang::hash is alleen binnen
+# dezelfde R-versie gegarandeerd gelijk). Voor vectoren en lijsten, met namen.
+als_tekst <- function(x) {
+  namen <- names(x) %||% rep("", length(x))
+  if (is.list(x)) {
+    paste0("{", paste(namen, vapply(x, als_tekst, ""), sep = ":", collapse = ","), "}")
+  } else {
+    paste0("[", paste(namen, as.character(x), sep = "=", collapse = ","), "]")
+  }
+}
+stabiele_hash <- function(x) as.character(openssl::md5(als_tekst(x)))
