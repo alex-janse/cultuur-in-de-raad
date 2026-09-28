@@ -17,12 +17,54 @@ huidig_jaar <- function() as.integer(format(Sys.Date(), "%Y"))
 STANDAARD_BEGINJAAR <- 2020L
 standaard_periode <- function() c(STANDAARD_BEGINJAAR, huidig_jaar())
 
+# Vrij zoeken (eigen termen, periode en opties) staat uit: de app toont dan
+# alleen voorberekende thema's en periodeblokken en doet geen verzoeken aan
+# de API van OpenBesluitvorming. De code blijft bestaan; TRUE zet het terug.
+VRIJ_ZOEKEN <- FALSE
+
+# Zonder vrij zoeken rekent de nachtelijke run elk thema over alle jaren uit;
+# de app telt de periodeblokken daaruit op (zie blok_resultaat()).
+volledige_periode <- function() c(as.integer(EERSTE_JAAR), huidig_jaar())
+
+# Periodeblokken van vier jaar. Raadsperiodes volgen de verkiezingen (maart
+# 2014, 2018, 2022, 2026), landelijke cultuurperiodes de cyclus van o.a.
+# Cultuureducatie met Kwaliteit. "nu" loopt tot en met het huidige jaar.
+# Na de verkiezingen van 2030 of de cultuurperiode 2029: blok toevoegen.
+PERIODES <- list(
+  "Raadsperiodes" = c("2022–2025" = "2022-2025",
+                      "2018–2021 (met coronajaren)" = "2018-2021",
+                      "2014–2017" = "2014-2017",
+                      "2026–nu (loopt nog)" = "2026-nu"),
+  "Landelijke cultuurperiodes" = c("2025–nu (loopt nog)" = "2025-nu",
+                                   "2021–2024" = "2021-2024",
+                                   "2017–2020" = "2017-2020"),
+  "Totaal" = c("2010–nu (alle jaren)" = "2010-nu")
+)
+STANDAARD_BLOK <- "2022-2025"
+
+# "2018-2021" -> c(2018, 2021); "2026-nu" -> c(2026, huidig jaar)
+blok_jaren <- function(blok) {
+  delen <- strsplit(blok, "-", fixed = TRUE)[[1]]
+  c(as.integer(delen[1]),
+    if (delen[2] == "nu") huidig_jaar() else as.integer(delen[2]))
+}
+# Welke indeling ("Raadsperiodes", ...) een blok hoort
+blok_indeling <- function(blok) {
+  names(PERIODES)[vapply(PERIODES, \(p) blok %in% p, logical(1))][1]
+}
+
+# Markeringen in de trendgrafiek
+CORONA <- c(2020 + 2 / 12, 2022 + 2 / 12)   # maart 2020 tot begin 2022
+VERKIEZINGSJAREN <- c(2014L, 2018L, 2022L, 2026L)
+CULTUURPERIODE_START <- c(2017L, 2021L, 2025L)
+
 # Versies van de voorberekende data. SCHEMA_VERSIE ophogen bij een andere
 # structuur van het resultaat, én bij een andere zoekvraag of telling in de
 # code (term_query, telling_aggs, ruw_naar_key, dekking_per_gemeente): die
 # zitten niet in de methode-versie, die alleen de instellingen volgt (zie
 # methode_versie() onderaan).
-SCHEMA_VERSIE <- 3L   # 2: trends per gemeente, dekking en bandbreedtes; 3: termkolommen n_<term>
+SCHEMA_VERSIE <- 4L   # 2: trends per gemeente, dekking en bandbreedtes; 3: termkolommen n_<term>;
+                      # 4: fragmenten en docs_jaren (vaste thema's zonder API)
 # Voorberekende data ouder dan dit wordt niet meer gebruikt (dan live)
 MAX_LEEFTIJD_DAGEN <- 7
 WAARSCHUW_LEEFTIJD_DAGEN <- 2
@@ -103,6 +145,8 @@ KLEUR <- c(
 PALET_KAART <- c("#F1E8F6", "#D2B6E3", "#A876C6", "#7B3AA2", "#4A1268")
 # Reeksen in grafieken (gemeenten, termen): paars, blauw, donkergeel, grijs
 PALET_REEKSEN <- c("#5C1A82", "#006CB2", "#C9A800", "#6B6B6B", "#A876C6")
+# Achtergrond van de gekozen periode in de trendgrafiek (licht blauw)
+KLEUR_BLOK <- "#CFE3F2"
 
 # --- Vergelijkbare gemeenten ------------------------------------------------
 # Grootteklassen op inwonertal; een rang binnen de eigen klasse is eerlijker

@@ -2682,13 +2682,13 @@
   },
   "files": {
     "app.R": {
-      "checksum": "67ae321fda267f1ff5f390737b478fab"
+      "checksum": "c4c36e6a84d133dd8fbaec19ec8eca78"
     },
     "R/00_pakketten.R": {
       "checksum": "8cbd0326cdeca71d715fdbac31aa17ab"
     },
     "R/api_ori.R": {
-      "checksum": "720b47b2cd6bc6945e631238aa339291"
+      "checksum": "10c09e0dcf177db07f9a08ff34fd5e29"
     },
     "R/cache.R": {
       "checksum": "1c12303b6854ec1e7419b8c470626218"
@@ -2697,7 +2697,7 @@
       "checksum": "aa442878af9790e7b3202f00599f31e4"
     },
     "R/config.R": {
-      "checksum": "b6cbea1a7c35465963b3c8e9d82d2dfb"
+      "checksum": "061e254f35bb59b0560c18bfb663cb54"
     },
     "R/export.R": {
       "checksum": "2f4d14fa8953d8afd0372618e00fc01c"
@@ -2715,7 +2715,7 @@
       "checksum": "8a65024cb67e62afd6647b7477e9ce51"
     },
     "R/plots.R": {
-      "checksum": "2d6d0ae268cd08017ab503c742dfed2b"
+      "checksum": "af506d3e1245529e2a65f00899007232"
     },
     "R/ranking.R": {
       "checksum": "8bdb1da5cb3b878c91ad90994dc3ff82"
@@ -2724,7 +2724,7 @@
       "checksum": "cf488d5cf895450b74a1c5fb367e71ac"
     },
     "R/voorberekend.R": {
-      "checksum": "1fa032a68a0e4e7188a578b61b2c6f1f"
+      "checksum": "66a68e1f2dd83a66878e8b84fb64ca04"
     }
   },
   "users": null

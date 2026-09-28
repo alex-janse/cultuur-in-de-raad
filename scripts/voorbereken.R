@@ -77,6 +77,10 @@ regel_van <- function(d, naam) {
   d[d$set == naam, , drop = FALSE]
 }
 
+# Zonder vrij zoeken: elk thema over alle jaren (de app telt de blokken
+# daaruit op), plus de voorbeelden die de app anders live zou ophalen
+periode <- if (VRIJ_ZOEKEN) standaard_periode() else volledige_periode()
+
 overzicht <- list()
 for (naam in names(voorberekende_sets())) {
   termen <- voorberekende_sets()[[naam]]
@@ -93,16 +97,29 @@ for (naam in names(voorberekende_sets())) {
 
   message("Zoekvraag ", naam, ": ", paste(termen, collapse = ", "))
   # Het resultaat bevat ook de trends van alle gemeenten
-  res <- probeer(naam, \() haal_data_op(termen, standaard_periode(), STANDAARD_OPTIES))
+  res <- probeer(naam, \() haal_data_op(termen, periode, STANDAARD_OPTIES))
   Sys.sleep(PAUZE)
+  if (!is.null(res) && !VRIJ_ZOEKEN) {
+    voorbeelden <- probeer(paste(naam, "(voorbeelden)"),
+                           \() haal_voorbeelden(termen, periode, STANDAARD_OPTIES))
+    Sys.sleep(PAUZE)
+    # Zonder voorbeelden zou het profiel toch live moeten: dan liever de
+    # vorige versie laten staan
+    if (is.null(voorbeelden)) {
+      res <- NULL
+    } else {
+      res$fragmenten <- voorbeelden$fragmenten
+      res$docs_jaren <- voorbeelden$docs
+    }
+  }
 
   rij <- if (!is.null(res)) {
     data.frame(
       set = naam, termen = paste(termen, collapse = ", "),
-      periode = paste(standaard_periode(), collapse = "-"),
+      periode = paste(periode, collapse = "-"),
       documenten = res$totaal_docs, gemeenten = nrow(res$per_gemeente),
       methode = methode_versie(),
-      sleutel = zoek_sleutel(termen, standaard_periode(), STANDAARD_OPTIES),
+      sleutel = zoek_sleutel(termen, periode, STANDAARD_OPTIES),
       berekend_op = format(res$berekend_op, "%Y-%m-%d %H:%M %Z")
     )
   }

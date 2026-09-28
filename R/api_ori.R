@@ -410,18 +410,78 @@ haal_fragmenten <- function(ruwe_namen, termen, jaren, opties = STANDAARD_OPTIES
   )
   json <- post_json(body, index = index_patroon(ruwe_namen))
   if (is.null(json$hits$hits)) stop("Onverwachte JSON-structuur voor fragmenten.")
+  bind_rows(lapply(json$hits$hits, hit_naar_fragment))
+}
 
-  bind_rows(lapply(json$hits$hits, function(h) {
-    s <- h[["_source"]]
-    frag <- unlist(h$highlight$text %||% list())
-    titel <- as.character(s$name %||% "(zonder titel)")
-    tibble(
-      titel = titel,
-      datum = substr(as.character(s$last_discussed_at %||% ""), 1, 10),
-      link = as.character(s$original_url %||% s$url %||% ""),
-      # Stukken waarin vaak namen van burgers staan: geen fragment tonen
-      privacy = grepl(PRIVACY_TITELS, tolower(titel)),
-      fragmenten = paste(gsub("\\s+", " ", frag), collapse = " … ")
+# Eén treffer (met markering) -> één rij: titel, datum, link, privacy, fragmenten
+hit_naar_fragment <- function(h) {
+  s <- h[["_source"]]
+  frag <- unlist(h$highlight$text %||% list())
+  titel <- as.character(s$name %||% "(zonder titel)")
+  tibble(
+    key = ruw_naar_key(index_naar_ruw(h[["_index"]])),
+    titel = titel,
+    datum = substr(as.character(s$last_discussed_at %||% ""), 1, 10),
+    link = as.character(s$original_url %||% s$url %||% ""),
+    # Stukken waarin vaak namen van burgers staan: geen fragment tonen
+    privacy = grepl(PRIVACY_TITELS, tolower(titel)),
+    fragmenten = paste(gsub("\\s+", " ", frag), collapse = " … ")
+  )
+}
+
+# Voor de nachtelijke run: in één verzoek de voorbeelden die de app anders
+# live zou ophalen. Per gemeente de nieuwste treffers met fragment (voor het
+# profiel) en per jaar de nieuwste treffers (voor 'Documenten' per blok).
+haal_voorbeelden <- function(termen, jaren, opties = STANDAARD_OPTIES,
+                             per_gemeente = 5, per_jaar = 30) {
+  markeer <- of_query(termen, modifyList(opties, list(context = FALSE)))
+  bron <- c("name", "last_discussed_at", "original_url", "url")
+  nieuwste <- list(list(last_discussed_at = "desc"))
+  body <- list(
+    size = 0,
+    query = list(bool = list(filter = list(periode_query(jaren),
+                                           of_query(termen, opties)))),
+    aggs = list(
+      gemeenten = list(
+        terms = list(field = "_index", size = 1000),
+        aggs = list(nieuwste = list(top_hits = list(
+          size = per_gemeente, sort = nieuwste, `_source` = bron,
+          highlight = list(
+            highlight_query = markeer,
+            pre_tags = list(MARK_BEGIN), post_tags = list(MARK_EIND),
+            fields = list(text = list(fragment_size = 220, number_of_fragments = 2),
+                          name = list(number_of_fragments = 0))
+          ))))),
+      jaren = list(
+        date_histogram = list(field = "last_discussed_at",
+                              calendar_interval = "year", min_doc_count = 1),
+        aggs = list(nieuwste = list(top_hits = list(
+          size = per_jaar, sort = nieuwste, `_source` = bron))))
     )
+  )
+  json <- post_json(body)
+  if (is.null(json$aggregations$gemeenten$buckets)) {
+    stop("Onverwachte JSON-structuur voor voorbeelden.")
+  }
+  hits <- function(buckets) {
+    unlist(lapply(buckets, \(b) b$nieuwste$hits$hits), recursive = FALSE)
+  }
+  fragmenten <- bind_rows(lapply(hits(json$aggregations$gemeenten$buckets),
+                                 hit_naar_fragment))
+  # Stadsdelen en fusies: per gemeente de nieuwste 'per_gemeente' houden
+  if (nrow(fragmenten) > 0) {
+    fragmenten <- fragmenten |>
+      arrange(key, desc(datum)) |>
+      group_by(key) |>
+      slice_head(n = per_gemeente) |>
+      ungroup()
+  }
+  docs <- bind_rows(lapply(hits(json$aggregations$jaren$buckets), function(h) {
+    s <- h[["_source"]]
+    tibble(key = ruw_naar_key(index_naar_ruw(h[["_index"]])),
+           titel = as.character(s$name %||% "(zonder titel)"),
+           datum = substr(as.character(s$last_discussed_at %||% ""), 1, 10),
+           link = as.character(s$original_url %||% s$url %||% ""))
   }))
+  list(fragmenten = fragmenten, docs = docs)
 }

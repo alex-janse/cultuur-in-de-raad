@@ -119,11 +119,11 @@ lees_zoekresultaat <- function(termen, jaren, opties) {
 }
 
 # Voorberekend resultaat als het er is. Tussen middernacht op 1 januari en
-# de nachtelijke run bestaat de standaardperiode van het nieuwe jaar nog
-# niet: dan de periode t/m vorig jaar gebruiken.
+# de nachtelijke run bestaat een periode tot en met het nieuwe jaar nog
+# niet: dan dezelfde periode t/m vorig jaar gebruiken.
 zoek_voorberekend <- function(termen, jaren, opties) {
   res <- lees_zoekresultaat(termen, jaren, opties)
-  if (is.null(res) && identical(as.integer(jaren), standaard_periode())) {
+  if (is.null(res) && as.integer(jaren[2]) == huidig_jaar()) {
     res <- lees_zoekresultaat(termen, c(jaren[1], jaren[2] - 1L), opties)
   }
   if (!is.null(res)) res$bron <- "voorberekend"
@@ -178,6 +178,55 @@ bron_regel <- function(versies, onderdeel, label, vandaag = Sys.Date()) {
                      tekst, datum(v$gecontroleerd))
   }
   tekst
+}
+
+# Een periodeblok uit een resultaat over alle jaren: tellingen, dekking en
+# maatstaven opnieuw uit de cijfers per jaar. Dubbele bijlagen zijn per jaar
+# samengevoegd, dus een bijlage die in twee jaren van het blok wordt
+# besproken telt twee keer (zie de uitleg). De trends blijven over alle jaren,
+# zodat de trendgrafiek het blok in zijn context laat zien.
+blok_resultaat <- function(res, jaren) {
+  jaren <- as.integer(jaren)
+  tr <- res$trends |> filter(jaar >= jaren[1], jaar <= jaren[2])
+  tel <- tr |>
+    group_by(key, term) |>
+    summarise(n = sum(n), archief = sum(archief), .groups = "drop")
+
+  per_gemeente <- tel |>
+    filter(term == "__alle__", archief > 0) |>
+    transmute(key, archief, totaal = n)
+  for (t in res$termen) {
+    n_t <- tel |> filter(term == t) |> select(key, n)
+    per_gemeente[[term_kolom(t)]] <-
+      coalesce(n_t$n[match(per_gemeente$key, n_t$key)], 0)
+  }
+  # Wat niet van het blok afhangt: namen, CBS-koppeling en inwoners
+  vast <- res$per_gemeente |>
+    select(key, any_of(c("ruw", "gemeentecode", "cbs_naam", "inwoners",
+                         "inwoners_jaar", "gemeente")))
+  per_gemeente <- per_gemeente |>
+    left_join(dekking_per_gemeente(tr), by = "key") |>
+    left_join(vast, by = "key") |>
+    mutate(gemeente = coalesce(gemeente, nette_naam(key))) |>
+    bereken_maatstaven(min_dekking = min(1, periode_jaren(jaren))) |>
+    arrange(desc(totaal))
+
+  docs <- res$docs_jaren %||% res$docs
+  if (NROW(docs) > 0) {
+    jaar <- suppressWarnings(as.integer(substr(docs$datum, 1, 4)))
+    docs <- docs[!is.na(jaar) & jaar >= jaren[1] & jaar <= jaren[2], ] |>
+      arrange(desc(datum)) |>
+      head(MAX_DOCS) |>
+      select(-any_of("gemeente")) |>
+      left_join(per_gemeente |> select(key, gemeente), by = "key")
+  }
+
+  res$per_gemeente <- per_gemeente
+  res$docs <- docs
+  res$totaal_docs <- sum(per_gemeente$totaal)
+  res$periode_volledig <- res$jaren
+  res$jaren <- jaren
+  res
 }
 
 # Leeftijd van voorberekende data in dagen (voor een waarschuwing)
