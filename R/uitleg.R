@@ -31,13 +31,16 @@ verhaal_gemeente <- function(rij, per_gemeente, trend, budget = NULL,
   naam <- rij$gemeente
   zinnen <- character()
 
-  if (isTRUE(rij$weinig_treffers) || is.na(rij$per_1000)) {
+  p <- if (!isTRUE(rij$weinig_treffers) && !is.na(rij$per_1000)) {
+    percentiel(rangschik(per_gemeente, "relatief"), rij$key)
+  }
+  # Zonder vergelijking (weinig treffers, of de enige gemeente met een rang)
+  if (is.null(p) || is.na(p)) {
     zinnen <- c(zinnen, sprintf(paste(
       "In %s komen de gekozen termen in %s documenten voor. Dat is te weinig",
       "om betrouwbaar met andere gemeenten te vergelijken."),
       naam, fmt(rij$totaal, 0)))
   } else {
-    p <- percentiel(rangschik(per_gemeente, "relatief"), rij$key)
     klasse <- grootteklasse(rij$inwoners)
     p_klasse <- if (!is.na(klasse)) {
       percentiel(rangschik(per_gemeente, "relatief", klasse), rij$key)
@@ -46,10 +49,11 @@ verhaal_gemeente <- function(rij, per_gemeente, trend, budget = NULL,
       if (p >= 50) sprintf("vaker dan %s", procent(p))
       else sprintf("minder vaak dan %s", procent(100 - p))
     }
-    zin <- sprintf("%s bespreekt deze thema's in verhouding %s van de gemeenten",
+    # Vergeleken wordt alleen met gemeenten die genoeg treffers en archief hebben
+    zin <- sprintf("%s bespreekt deze thema's in verhouding %s van de vergeleken gemeenten",
                    naam, vergelijk(p))
     if (!is.null(p_klasse) && !is.na(p_klasse)) {
-      zin <- sprintf("%s, en %s van de gemeenten met %s", zin,
+      zin <- sprintf("%s, en %s van de vergeleken gemeenten met %s", zin,
                      vergelijk(p_klasse), klasse)
     }
     zinnen <- c(zinnen, paste0(zin, "."))
@@ -141,6 +145,9 @@ uitleg_ui <- function() {
               "gemeenteprofiel laat de zinnen zien, zodat je dat kunt nagaan."),
       tags$li("Niet alle gemeenten hebben een archief in OpenBesluitvorming;",
               "die zijn grijs op de kaart."),
+      tags$li("De jaren in de trend tellen samen iets meer op dan het totaal:",
+              "een bijlage die in twee jaren wordt besproken, telt in de trend",
+              "in beide jaren mee."),
       tags$li("Het cultuurbudget is een indicatie (CBS, inclusief",
               "afschrijvingen en verrekeningen)."),
       tags$li("Dit is een testversie: de betrouwbaarheid per zoekterm wordt",

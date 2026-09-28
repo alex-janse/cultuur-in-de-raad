@@ -135,6 +135,11 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
   fusiedatum. Heeft niet elke voorganger een archief (Voorne aan Zee: geen
   Hellevoetsluis), dan telt 'per 100.000 inwoners' alleen de jaren vanaf de
   fusie (`ONVOLLEDIGE_FUSIES` in `R/config.R`).
+- **Trend en totaal tellen net anders**: dubbele bijlagen worden in de trend
+  per jaar samengevoegd en in het totaal over de hele periode. Een bijlage
+  die in twee jaren wordt besproken telt in de trend dus twee keer (in de
+  praktijk tot ongeveer 6% verschil). Bij de grootste archieven (Amsterdam)
+  is het aantal unieke bijlagen een schatting met een marge van ongeveer 1%.
 - **Verzoeklimiet**: bij veel zoekvragen kort na elkaar geeft de API een
   melding (HTTP 429). Probeer het dan ongeveer 10 minuten later opnieuw; de
   standaardvragen en themasets zijn voorberekend en werken gewoon.
@@ -155,8 +160,8 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
   `R/config.R`).
 - **Verwijderen**: staat er iets over jou in een raadsstuk dat daar niet
   hoort, dan kan dat alleen bij de bron worden verwijderd (de gemeente en
-  OpenBesluitvorming.nl). Daarna verdwijnt het hier vanzelf, uiterlijk na de
-  volgende nachtelijke bijwerking.
+  OpenBesluitvorming.nl). Daarna verdwijnt het hier vanzelf na de nachtelijke
+  bijwerking: meestal binnen een dag, uiterlijk na ongeveer een week.
 - **Veiligheid**: tekst uit de bron wordt altijd ge-escaped, links worden
   alleen getoond als ze met `http(s)://` beginnen, CSV-downloads zijn
   beschermd tegen formules (`=`, `+`, `-`, `@`) en voorberekende bestanden

@@ -29,15 +29,17 @@ rangschik <- function(per_gemeente, maatstaf, klasse = NULL) {
   }
   df |>
     arrange(weinig_treffers, desc(waarde)) |>
-    mutate(rang = ifelse(weinig_treffers, NA_integer_,
-                         cumsum(!weinig_treffers)))
+    # Gelijke waarden krijgen dezelfde rang (1, 2, 2, 4)
+    mutate(rang = as.integer(min_rank(ifelse(weinig_treffers, NA, -waarde))))
 }
 
 # "rang 11 van 239", of waarom er geen rang is
 rang_tekst <- function(gerangschikt, key) {
   rij <- gerangschikt[gerangschikt$key == key, ]
   if (nrow(rij) == 0) return("niet gerangschikt (te weinig gegevens)")
-  if (is.na(rij$rang)) return("geen rang: minder dan 10 treffers")
+  if (is.na(rij$rang)) {
+    return(sprintf("geen rang: minder dan %d treffers", MIN_TREFFERS_RANG))
+  }
   sprintf("rang %d van %d", rij$rang, sum(!is.na(gerangschikt$rang)))
 }
 

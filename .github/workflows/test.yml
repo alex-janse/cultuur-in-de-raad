@@ -17,6 +17,8 @@ jobs:
 
       - uses: r-lib/actions/setup-r@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2
         with:
+          # Dezelfde R-versie als de app op Connect (manifest.json, "platform")
+          r-version: "4.6.1"
           use-public-rspm: true
 
       - name: Systeembibliotheken voor sf

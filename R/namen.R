@@ -48,3 +48,9 @@ schoon_termen <- function(termen) {
   termen <- unique(gsub("\\s+", " ", trimws(termen)))
   head(termen[nchar(termen) >= 2], MAX_TERMEN)
 }
+
+# Keys -> gemeentenamen voor tekst (bv. alt-teksten); "NL" is heel Nederland
+namen_van <- function(keys, res) {
+  naam <- res$per_gemeente$gemeente[match(keys, res$per_gemeente$key)]
+  ifelse(keys == "NL", "heel Nederland", coalesce(naam, keys))
+}

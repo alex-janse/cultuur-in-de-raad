@@ -28,3 +28,13 @@ test_that("alle gebruikte pakketten staan in manifest.json", {
   ontbreekt <- setdiff(gebruikt, names(manifest$packages))
   expect_equal(ontbreekt, character(), info = "maak manifest.json opnieuw")
 })
+
+test_that("de workflows gebruiken dezelfde R-versie als de app op Connect", {
+  for (wf in c("test.yml", "voorbereken.yml")) {
+    tekst <- readLines(file.path(root, ".github", "workflows", wf), warn = FALSE)
+    versie <- sub('.*r-version: "([0-9.]+)".*', "\\1",
+                  grep("r-version:", tekst, value = TRUE))
+    expect_equal(versie, manifest$platform,
+                 info = paste(wf, "wijkt af van manifest.json; pas r-version aan"))
+  }
+})

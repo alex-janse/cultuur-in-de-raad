@@ -559,14 +559,26 @@ server <- function(input, output, session) {
   # link die op een ander tabblad opent; anders gaan de kaartlagen verloren
   outputOptions(output, "kaart", suspendWhenHidden = FALSE)
 
-  # Gemeentegrenzen: eerste keer ~2 s bij PDOK, daarna uit de schijfcache
-  grenzen <- tryCatch(per_proces("grenzen", haal_gemeentegrenzen), error = function(e) {
-    showNotification(paste("Gemeentegrenzen niet beschikbaar:",
-                           conditionMessage(e)), type = "error", duration = 10)
-    NULL
+  # Gemeentegrenzen: normaal uit de nachtelijke voorberekening, anders ~2 s
+  # bij PDOK. Mislukt dat, dan elke vijf minuten opnieuw (het ophalen
+  # blokkeert het proces), zodat de kaart binnen deze sessie herstelt; de
+  # melding komt één keer.
+  grenzen_gemeld <- FALSE
+  grenzen <- reactive({
+    tryCatch(per_proces("grenzen", haal_gemeentegrenzen, fout_geldig = 5 * 60),
+             error = function(e) {
+      if (!grenzen_gemeld) {
+        grenzen_gemeld <<- TRUE
+        showNotification(paste("Gemeentegrenzen niet beschikbaar:",
+                               conditionMessage(e)), type = "error", duration = 10)
+      }
+      invalidateLater(5 * 60 * 1000)
+      NULL
+    })
   })
 
   observe({
+    grenzen <- grenzen()
     req(grenzen)
     res <- resultaat()
     req(res)
@@ -582,6 +594,8 @@ server <- function(input, output, session) {
     req(nzchar(input$ga_naar))
     updateSelectInput(session, "profiel_gemeente", selected = input$ga_naar)
     updateTabsetPanel(session, "tabs", selected = "profiel")
+    # Leegmaken, zodat dezelfde gemeente later opnieuw gekozen kan worden
+    updateSelectizeInput(session, "ga_naar", selected = "")
   })
 
   observeEvent(input$kaart_shape_click, {
@@ -698,7 +712,7 @@ server <- function(input, output, session) {
     sprintf(paste("Lijngrafieken per zoekterm (%s) met de aandacht per jaar",
                   "van %d tot en met %d voor: %s."),
             paste(res$termen, collapse = ", "), res$jaren[1], res$jaren[2],
-            paste(input$trend_gebieden, collapse = ", "))
+            paste(namen_van(input$trend_gebieden, res), collapse = ", "))
   }))
 
   output$dl_trend <- downloadHandler(
@@ -779,9 +793,14 @@ server <- function(input, output, session) {
                     ") · ", rang("per_100k"))),
         blok(fmt(rij$totaal, 0),
              if (is.na(rij$jaren_dekking)) "documenten met een treffer"
-             else sprintf("documenten met een treffer · archief in %s van %s jaar",
-                          fmt(rij$jaren_dekking),
-                          fmt(periode_jaren(resultaat()$jaren)))),
+             else paste0(
+               sprintf("documenten met een treffer · archief in %s van %s jaar",
+                       fmt(rij$jaren_dekking),
+                       fmt(periode_jaren(resultaat()$jaren))),
+               # Bv. een fusiegemeente zonder eigen archief (Land van Cuijk)
+               if (isTRUE(rij$laatste_jaar < min(resultaat()$jaren[2], huidig_jaar()) - 1)) {
+                 sprintf(", alleen tot en met %d", rij$laatste_jaar)
+               })),
         blok(fmt(rij$inwoners, 0), "inwoners (CBS)"),
         if (!is.null(euro) && !is.na(euro)) {
           blok(paste0("€", fmt(euro, 0)),
@@ -1014,17 +1033,28 @@ server <- function(input, output, session) {
                sprintf('<a href="%s" target="_blank">%s</a>',
                        htmltools::htmlEscape(link, attribute = TRUE),
                        htmltools::htmlEscape(titel)),
-               htmltools::htmlEscape(titel))) |>
+               htmltools::htmlEscape(titel)),
+             # sanitize.text.function staat uit (voor de link): zelf escapen
+             gemeente = htmltools::htmlEscape(gemeente),
+             datum = htmltools::htmlEscape(datum)) |>
       select(Gemeente = gemeente, Datum = datum, Document = titel)
   }, striped = TRUE, sanitize.text.function = identity)
 
   output$dl_docs <- downloadHandler(
     filename = \() sprintf("cultuur-documenten-%s.csv", Sys.Date()),
-    content = \(file) schrijf_csv(
-      resultaat()$docs |>
-        mutate(link = veilige_link(link)) |>
-        select(Gemeente = gemeente, Datum = datum, Titel = titel, Link = link),
-      file)
+    content = function(file) {
+      docs <- resultaat()$docs
+      # Zonder treffers is docs een lege tabel zonder kolommen
+      docs <- if (NROW(docs) == 0) {
+        tibble(Gemeente = character(), Datum = character(), Titel = character(),
+               Link = character())
+      } else {
+        docs |>
+          mutate(link = veilige_link(link)) |>
+          select(Gemeente = gemeente, Datum = datum, Titel = titel, Link = link)
+      }
+      schrijf_csv(docs, file)
+    }
   )
 }
 

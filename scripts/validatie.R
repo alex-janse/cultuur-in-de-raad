@@ -12,7 +12,10 @@
 #      opgeslagen als validatie/precisie_<datum>.csv
 #
 # Gebruikt de standaardperiode en -opties van de app (incl. cultuurcontext).
-# Eén verzoek per term, met pauzes, i.v.m. de limiet van de API.
+# Eén verzoek per term (standaard alle termen van de themasets, 16 stuks),
+# met pauzes, i.v.m. de limiet van de API. Bij een blokkade (HTTP 429) wacht
+# het script tot die voorbij is; lukt een term niet, dan wordt de steekproef
+# als onvolledig bewaard en stopt het script met een fout.
 # =============================================================================
 
 suppressMessages(shiny::loadSupport(".", renv = globalenv()))
@@ -70,24 +73,38 @@ if (opdracht == "steekproef") {
   delen <- list()
   for (term in termen) {
     message("Steekproef: ", term)
-    delen[[term]] <- tryCatch(steekproef_term(term, aantal), error = function(e) {
-      message("  mislukt: ", conditionMessage(e))
-      NULL
-    })
-    Sys.sleep(5)
+    # probeer() (R/nachtrun.R) wacht bij een blokkade tot die voorbij is
+    delen[[term]] <- probeer(term, \() steekproef_term(term, aantal), pogingen = 2)
+    Sys.sleep(20)
   }
+  mislukt <- setdiff(termen, names(Filter(Negate(is.null), delen)))
   uit <- bind_rows(delen) |> mutate(id = row_number(), .before = 1)
-  bestand <- file.path("validatie", sprintf("steekproef_%s.csv", Sys.Date()))
+  bestand <- file.path("validatie", sprintf("steekproef_%s%s.csv", Sys.Date(),
+                                            if (length(mislukt) > 0) "_onvolledig" else ""))
   schrijf_csv(uit, bestand)
   message(sprintf("%d treffers voor %d termen -> %s", nrow(uit),
                   length(unique(uit$term)), bestand))
+  if (length(mislukt) > 0) {
+    stop("Geen steekproef voor: ", paste(mislukt, collapse = ", "),
+         ". Probeer die later opnieuw met: Rscript scripts/validatie.R steekproef ",
+         aantal, " <term ...>")
+  }
   message("Vul de kolom 'relevant' in met ja / nee / twijfel en draai daarna:")
   message("  Rscript scripts/validatie.R bereken ", bestand)
 
 } else if (opdracht == "bereken") {
   bestand <- args[2]
-  d <- utils::read.csv2(bestand, fileEncoding = "UTF-8-BOM",
-                        stringsAsFactors = FALSE)
+  # Excel bewaart 'CSV (;)' vaak in Windows-codering; dan valt UTF-8 halverwege
+  # stil af. Daarom bij een waarschuwing opnieuw als Windows-1252.
+  d <- tryCatch(
+    utils::read.csv2(bestand, fileEncoding = "UTF-8-BOM", stringsAsFactors = FALSE),
+    warning = function(w) {
+      utils::read.csv2(bestand, fileEncoding = "CP1252", stringsAsFactors = FALSE)
+    })
+  if (nrow(d) != max(d$id)) {
+    stop(sprintf("Maar %d van de %d rijen ingelezen; controleer het bestand.",
+                 nrow(d), max(d$id)))
+  }
   d$relevant <- tolower(trimws(d$relevant))
   onbekend <- setdiff(unique(d$relevant), c("ja", "nee", "twijfel", ""))
   if (length(onbekend) > 0) {
