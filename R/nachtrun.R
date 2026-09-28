@@ -94,7 +94,7 @@ probeer <- function(naam, expr_fn, pogingen = 3, slaap = Sys.sleep) {
       withCallingHandlers(expr_fn(), warning = function(w) {
         # stop(w) zou een waarschuwing blijven; een nieuwe fout wordt wél
         # door tryCatch hieronder opgevangen
-        if (grepl("archiefdelen", conditionMessage(w))) stop(conditionMessage(w))
+        if (grepl("onvolledig", conditionMessage(w))) stop(conditionMessage(w))
       }),
       error = function(e) e
     )

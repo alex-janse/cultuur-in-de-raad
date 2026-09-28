@@ -58,8 +58,8 @@ lees_rds_veilig <- function(pad) {
 }
 
 # Onthoudt per bestand de uitkomst, óók 'niet gevonden': een echte 404 een
-# uur, andere fouten (time-out, storing bij GitHub) maar een minuut, zodat
-# de app niet een uur lang onnodig live gaat.
+# uur, andere fouten (time-out, storing bij GitHub) vijf minuten. Het verzoek
+# blokkeert het proces, dus bij een trage GitHub niet elke minuut opnieuw.
 voorberekend_geheugen <- new.env()
 
 lees_voorberekend <- function(bestand) {
@@ -80,7 +80,7 @@ lees_voorberekend <- function(bestand) {
   on.exit(unlink(tmp), add = TRUE)
   uitkomst <- tryCatch({
     resp <- request(paste0(basis, "/", bestand)) |>
-      req_timeout(20) |>
+      req_timeout(10) |>
       req_error(is_error = \(r) FALSE) |>
       req_perform(path = tmp)
     if (resp_status(resp) == 200) {
@@ -88,9 +88,9 @@ lees_voorberekend <- function(bestand) {
     } else if (resp_status(resp) == 404) {
       list(data = NULL, geldig = 3600)
     } else {
-      list(data = NULL, geldig = 60)
+      list(data = NULL, geldig = 300)
     }
-  }, error = function(e) list(data = NULL, geldig = 60))
+  }, error = function(e) list(data = NULL, geldig = 300))
 
   voorberekend_geheugen[[bestand]] <- list(
     data = uitkomst$data, geldig_tot = Sys.time() + uitkomst$geldig)

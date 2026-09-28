@@ -174,12 +174,22 @@ post_json <- function(body, index = "ori_*", pogingen = 2) {
 
   # Blijvend mislukt, bv. een te korte term met woordvormen ('kunst*') die
   # de expansielimiet overschrijdt: dan doet een deel van het archief niet mee.
+  # Ook een afgebroken zoekvraag (time-out) of een antwoord waarin niet alle
+  # archieven passen is onvolledig. Alle meldingen bevatten "onvolledig": de
+  # nachtelijke run en de app herkennen ze daaraan.
   mislukt <- json$`_shards`$failed %||% 0
-  if (mislukt > 0) {
-    warning(sprintf(paste(
+  melding <- if (mislukt > 0) {
+    sprintf(paste(
       "%d van de %d archiefdelen konden niet worden doorzocht; de cijfers",
       "zijn onvolledig. Probeer een langere term of zet 'woordvormen' uit."),
-      mislukt, json$`_shards`$total %||% NA))
+      mislukt, json$`_shards`$total %||% NA)
+  } else if (isTRUE(json$timed_out)) {
+    "De API brak de zoekvraag af (time-out); de cijfers zijn onvolledig."
+  } else if ((json$aggregations$gemeenten$sum_other_doc_count %||% 0) > 0) {
+    "Niet alle archieven passen in het antwoord; de cijfers zijn onvolledig."
+  }
+  if (!is.null(melding)) {
+    warning(melding)
   } else {
     ori_cache$set(sleutel, json)  # onvolledige antwoorden niet bewaren
   }
