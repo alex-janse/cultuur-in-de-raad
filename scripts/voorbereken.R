@@ -7,6 +7,7 @@
 #   cbs_inwoners.rds, iv3_<keuze>.rds, gemeentegrenzen.rds
 #   bronversies.rds       welke versie van CBS en PDOK daarin zit
 #   overzicht.csv         wat er is berekend en wanneer
+#   afgekeurd.csv         verdachte uitkomsten van deze nacht (ter bevestiging)
 # Mislukt een onderdeel, dan blijft de vorige versie in de uitvoermap staan.
 # =============================================================================
 
@@ -23,34 +24,10 @@ options(cultuur.voorberekend_url = NA,
 suppressMessages(shiny::loadSupport(".", renv = globalenv()))
 
 PAUZE <- 20  # seconden tussen zware verzoeken, i.v.m. de limiet van de API
+begin <- Sys.time()
 
-# Probeert expr een paar keer; wacht lang bij HTTP 429. Een onvolledig
-# antwoord van de API (waarschuwing uit post_json) geldt als fout: dat
-# willen we niet bewaren. Andere waarschuwingen laten we gewoon door.
-probeer <- function(naam, expr_fn, pogingen = 3) {
-  for (i in seq_len(pogingen)) {
-    uitkomst <- tryCatch(
-      withCallingHandlers(expr_fn(), warning = function(w) {
-        # stop(w) zou een waarschuwing blijven; een nieuwe fout wordt wél
-        # door tryCatch hieronder opgevangen
-        if (grepl("archiefdelen", conditionMessage(w))) stop(conditionMessage(w))
-      }),
-      error = function(e) e
-    )
-    if (!inherits(uitkomst, "error")) return(uitkomst)
-    melding <- conditionMessage(uitkomst)
-    wacht <- if (grepl("429", melding)) 300 else 60
-    message(sprintf("  %s: poging %d mislukt (%s)", naam, i, melding))
-    if (i < pogingen) Sys.sleep(wacht)
-  }
-  NULL
-}
-
-mislukt <- character()
-bewaar <- function(data, bestand) {
-  saveRDS(data, file.path(uitvoer, bestand))
-  message(sprintf("  opgeslagen: %s", bestand))
-}
+# De beslissingen (bijwerken, overslaan, afkeuren) staan in R/nachtrun.R
+staat <- nieuwe_run(uitvoer, forceer = identical(Sys.getenv("CBS_OPNIEUW"), "true"))
 
 # --- CBS en gemeentegrenzen ---------------------------------------------------
 
@@ -59,90 +36,61 @@ bewaar <- function(data, bestand) {
 # dan wordt er gedownload. CBS_OPNIEUW=true (handmatige run) haalt alles op.
 # Is de bron onbereikbaar bij de controle, dan blijft de vorige versie staan:
 # een waarschuwing, geen fout.
-forceer <- identical(Sys.getenv("CBS_OPNIEUW"), "true")
-versies_pad <- file.path(uitvoer, "bronversies.rds")
-versies <- if (file.exists(versies_pad)) readRDS(versies_pad) else leeg_bronversies()
-waarschuwingen <- character()
-vandaag <- format(Sys.Date())
-
-werk_bij <- function(onderdeel, bestand, versie_fn, haal_fn) {
-  message(onderdeel)
-  pad <- file.path(uitvoer, bestand)
-  rij <- which(versies$onderdeel == onderdeel)
-  nieuw <- probeer(paste(onderdeel, "(controle)"), versie_fn, pogingen = 2)
-  if (is.null(nieuw)) {
-    if (file.exists(pad)) {
-      waarschuwingen <<- c(waarschuwingen, onderdeel)
-      message("  niet te controleren; de vorige versie blijft staan")
-      return(invisible(FALSE))
-    }
-    nieuw <- list(versie = NA_character_, bron_datum = NA_character_)
-  } else if (length(rij) == 1) {
-    versies$gecontroleerd[rij] <<- vandaag
-    if (!forceer && file.exists(pad) && identical(versies$versie[rij], nieuw$versie)) {
-      message(sprintf("  ongewijzigd (%s)", nieuw$versie))
-      return(invisible(FALSE))
-    }
-  }
-
-  data <- probeer(onderdeel, haal_fn)
-  if (is.null(data)) {
-    mislukt <<- c(mislukt, onderdeel)
-    return(invisible(FALSE))
-  }
-  bewaar(data, bestand)
-  regel <- data.frame(onderdeel = onderdeel, versie = nieuw$versie,
-                      bron_datum = nieuw$bron_datum, opgehaald = vandaag,
-                      gecontroleerd = if (is.na(nieuw$versie)) NA_character_ else vandaag)
-  versies <<- rbind(versies[versies$onderdeel != onderdeel, , drop = FALSE], regel)
-  invisible(TRUE)
-}
-
-werk_bij("inwoners", "cbs_inwoners.rds", \() cbs_versie("inwoners"), haal_inwoners)
+werk_bij(staat, "inwoners", "cbs_inwoners.rds", \() cbs_versie("inwoners"),
+         \(nieuw) haal_inwoners())
 # De zoekvragen koppelen archieven aan gemeenten via deze inwoners; zonder
 # zouden ze zonder gemeentecodes (kaart, per inwoner) worden gepubliceerd
 if (!inwoners_naar_cache(uitvoer)) message("  geen CBS-inwoners beschikbaar")
 
 for (keuze in IV3_KEUZES) {
-  werk_bij(keuze, sprintf("iv3_%s.rds", keuze), \() cbs_versie(keuze),
-           \() haal_cultuurlasten(keuze))
+  werk_bij(staat, keuze, sprintf("iv3_%s.rds", keuze), \() cbs_versie(keuze),
+           \(nieuw) haal_cultuurlasten(keuze))
 }
 
-werk_bij("grenzen", "gemeentegrenzen.rds",
-         \() list(versie = paste("PDOK", grenzen_jaar()), bron_datum = NA_character_),
-         haal_gemeentegrenzen)
+# Precies het jaar downloaden dat bij de controle is gevonden
+werk_bij(staat, "grenzen", "gemeentegrenzen.rds",
+         \() {
+           jaar <- grenzen_jaar()
+           list(versie = paste("PDOK", jaar), bron_datum = NA_character_, jaar = jaar)
+         },
+         \(nieuw) if (is.null(nieuw$jaar)) haal_gemeentegrenzen() else
+           haal_gemeentegrenzen(nieuw$jaar))
 
 # Alleen versies van onderdelen die nog bestaan (bv. niet een oud Iv3-jaar)
+versies <- staat$versies
 versies <- versies[versies$onderdeel %in% c("inwoners", IV3_KEUZES, "grenzen"), ]
-saveRDS(versies, versies_pad)
+saveRDS(versies, file.path(uitvoer, "bronversies.rds"))
 
 
 # --- Standaardzoekvragen ----------------------------------------------------
 
-# Vorig overzicht (van de data-tak) om nieuwe uitkomsten mee te vergelijken
+# Vorig overzicht (van de data-tak) om nieuwe uitkomsten mee te vergelijken,
+# en de uitkomsten die de vorige nacht als verdacht zijn afgekeurd
 vorig_pad <- file.path(uitvoer, "overzicht.csv")
-vorige <- if (file.exists(vorig_pad)) utils::read.csv(vorig_pad) else data.frame()
+vorige <- lees_overzicht(vorig_pad)
+afgekeurd_pad <- file.path(uitvoer, "afgekeurd.csv")
+afgekeurd <- lees_overzicht(afgekeurd_pad)
+nieuw_afgekeurd <- list()
 
-# Een nieuwe uitkomst die sterk afwijkt van de vorige nacht (met dezelfde
-# methode en periode) is verdacht: bv. ontbrekende archieven bij de API.
-# Dan liever de vorige versie laten staan dan onzin publiceren.
-MAX_AFWIJKING <- 0.2
-verdacht <- function(naam, rij) {
-  v <- vorige[vorige$set == naam, , drop = FALSE]
-  if (nrow(v) != 1 || !all(c("methode", "gemeenten") %in% names(v))) return(NULL)
-  if (v$methode != rij$methode || v$periode != rij$periode) return(NULL)
-  if (rij$gemeenten < (1 - MAX_AFWIJKING) * v$gemeenten) {
-    return(sprintf("%d archieven, vorige keer %d", rij$gemeenten, v$gemeenten))
-  }
-  if (abs(rij$documenten - v$documenten) > MAX_AFWIJKING * v$documenten) {
-    return(sprintf("%d documenten, vorige keer %d", rij$documenten, v$documenten))
-  }
-  NULL
+regel_van <- function(d, naam) {
+  if (nrow(d) == 0) return(NULL)
+  d[d$set == naam, , drop = FALSE]
 }
 
 overzicht <- list()
 for (naam in names(voorberekende_sets())) {
   termen <- voorberekende_sets()[[naam]]
+  vorig <- regel_van(vorige, naam)
+
+  # Tijdsbudget op: geen nieuwe zoekvraag starten, zodat de run publiceert
+  # wat er al gelukt is in plaats van door de time-out alles kwijt te raken
+  if (difftime(Sys.time(), begin, units = "mins") > TIJDBUDGET_MINUTEN) {
+    message(sprintf("Zoekvraag %s overgeslagen: tijdsbudget op", naam))
+    staat$mislukt <- c(staat$mislukt, sprintf("%s (tijdsbudget op)", naam))
+    if (NROW(vorig) == 1) overzicht[[naam]] <- vorig
+    next
+  }
+
   message("Zoekvraag ", naam, ": ", paste(termen, collapse = ", "))
   # Het resultaat bevat ook de trends van alle gemeenten
   res <- probeer(naam, \() haal_data_op(termen, standaard_periode(), STANDAARD_OPTIES))
@@ -164,17 +112,24 @@ for (naam in names(voorberekende_sets())) {
     # Zonder koppeling aan CBS-gemeenten geen kaart en geen cijfers per inwoner
     "geen CBS-inwoners"
   } else {
-    verdacht(naam, rij)
+    # Een uitkomst die sterk afwijkt van de gepubliceerde versie is verdacht,
+    # tenzij de vorige nacht al vrijwel dezelfde uitkomst gaf
+    r <- verdacht(rij, vorig, regel_van(afgekeurd, naam))
+    if (!is.null(r)) {
+      nieuw_afgekeurd[[naam]] <- rij
+      r <- paste0(r, "; wordt gepubliceerd als de volgende nacht hetzelfde geeft")
+    }
+    r
   }
   if (!is.null(reden)) {
     message(sprintf("  %s niet bijgewerkt: %s", naam, reden))
-    mislukt <- c(mislukt, sprintf("%s (%s)", naam, reden))
+    staat$mislukt <- c(staat$mislukt, sprintf("%s (%s)", naam, reden))
     # De vorige versie blijft staan en in het overzicht
-    v <- vorige[vorige$set == naam, , drop = FALSE]
-    if (nrow(v) == 1) overzicht[[naam]] <- v
+    if (NROW(vorig) == 1) overzicht[[naam]] <- vorig
     next
   }
-  bewaar(res, sprintf("zoek_%s.rds", rij$sleutel))
+  saveRDS(res, file.path(uitvoer, sprintf("zoek_%s.rds", rij$sleutel)))
+  message(sprintf("  opgeslagen: zoek_%s.rds", rij$sleutel))
   overzicht[[naam]] <- rij
 
   # Archieven zonder CBS-gemeente: meestal een nieuwe fusie of een afwijkende
@@ -187,18 +142,23 @@ for (naam in names(voorberekende_sets())) {
       message("Archieven zonder CBS-gemeente: ", paste(onbekend, collapse = ", "))
       writeLines(onbekend, onbekend_pad)
     } else if (file.exists(onbekend_pad)) {
-      file.remove(onbekend_pad)
+      invisible(file.remove(onbekend_pad))
     }
   }
+}
+
+if (length(nieuw_afgekeurd) > 0) {
+  utils::write.csv(dplyr::bind_rows(nieuw_afgekeurd), afgekeurd_pad, row.names = FALSE)
+} else if (file.exists(afgekeurd_pad)) {
+  invisible(file.remove(afgekeurd_pad))
 }
 
 if (length(overzicht) > 0) {
   nieuw <- dplyr::bind_rows(overzicht)
   utils::write.csv(nieuw, vorig_pad, row.names = FALSE)
   # Opruimen: zoekresultaten die niet (meer) in het overzicht staan, bv. na
-  # een andere methode of periode
-  houden <- sprintf("zoek_%s.rds", nieuw$sleutel)
-  oud <- setdiff(list.files(uitvoer, pattern = "^zoek_.*[.]rds$"), houden)
+  # een andere methode of periode, en Iv3-bestanden van oude keuzes
+  oud <- op_te_ruimen(list.files(uitvoer), nieuw$sleutel)
   if (length(oud) > 0) {
     file.remove(file.path(uitvoer, oud))
     message("Opgeruimd: ", paste(oud, collapse = ", "))
@@ -210,20 +170,21 @@ if (length(overzicht) > 0) {
 # mislukt.txt laat de workflow na het publiceren rood worden, zodat een
 # gedeeltelijke mislukking opvalt (de geslaagde delen zijn dan wél bijgewerkt)
 waarschuwing_pad <- file.path(uitvoer, "..", "niet_gecontroleerd.txt")
-if (length(waarschuwingen) > 0) {
+if (length(staat$waarschuwingen) > 0) {
   message("Niet te controleren (vorige versie blijft): ",
-          paste(waarschuwingen, collapse = "; "))
-  writeLines(waarschuwingen, waarschuwing_pad)
+          paste(staat$waarschuwingen, collapse = "; "))
+  writeLines(staat$waarschuwingen, waarschuwing_pad)
 } else if (file.exists(waarschuwing_pad)) {
-  file.remove(waarschuwing_pad)
+  invisible(file.remove(waarschuwing_pad))
 }
 
+mislukt <- staat$mislukt
 mislukt_pad <- file.path(uitvoer, "..", "mislukt.txt")
 if (length(mislukt) > 0) {
   message("Mislukt of niet bijgewerkt: ", paste(mislukt, collapse = "; "))
   writeLines(mislukt, mislukt_pad)
 } else if (file.exists(mislukt_pad)) {
-  file.remove(mislukt_pad)
+  invisible(file.remove(mislukt_pad))
 }
 aantal_onderdelen <- 1 + length(IV3_KEUZES) + 1 + length(voorberekende_sets())
 if (length(mislukt) == aantal_onderdelen) {

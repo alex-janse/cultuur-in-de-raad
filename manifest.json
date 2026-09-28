@@ -2694,7 +2694,7 @@
       "checksum": "fcd37db882e6337b953ea97caee28856"
     },
     "R/cbs.R": {
-      "checksum": "12ef0f92296ee728f9d10c94551ffe3d"
+      "checksum": "aa442878af9790e7b3202f00599f31e4"
     },
     "R/config.R": {
       "checksum": "dc95c24e01130570c7eb34d928830ee8"
@@ -2703,10 +2703,13 @@
       "checksum": "2f4d14fa8953d8afd0372618e00fc01c"
     },
     "R/geo.R": {
-      "checksum": "0f27d3ecc433e2c88f7e03077104add6"
+      "checksum": "9c85ef550e7888ffbe584cc0031ff584"
     },
     "R/kaart.R": {
       "checksum": "1d0f3f952f0d96573ddab4f6cb39a866"
+    },
+    "R/nachtrun.R": {
+      "checksum": "da8d296b382856ad2827ea7fca6d4108"
     },
     "R/namen.R": {
       "checksum": "5d39985b379a4caeee6912d953df43d4"

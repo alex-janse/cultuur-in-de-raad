@@ -26,9 +26,11 @@ grenzen_jaar <- function() {
 
 # Gemeentegrenzen van dit jaar (of vorig jaar als die er nog niet zijn),
 # vereenvoudigd tot ~250 m zodat de kaart vlot laadt. 90 dagen op schijf.
-haal_gemeentegrenzen <- function() {
+# De nachtelijke run geeft het jaar mee dat grenzen_jaar() vond, zodat er
+# niet stil een ouder jaar wordt opgeslagen dan is vastgelegd.
+haal_gemeentegrenzen <- function(jaren = c(huidig_jaar(), huidig_jaar() - 1)) {
   schijf_cache("gemeentegrenzen", max_dagen = 90, function() {
-    for (jaar in c(huidig_jaar(), huidig_jaar() - 1)) {
+    for (jaar in jaren) {
       bestand <- tempfile(fileext = ".geojson")
       ok <- tryCatch({
         request(sprintf(GEO_URL, jaar)) |> req_timeout(60) |>

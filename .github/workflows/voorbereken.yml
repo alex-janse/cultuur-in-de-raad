@@ -23,15 +23,33 @@ concurrency:
 jobs:
   voorbereken:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # Het script start na 75 minuten geen nieuwe zoekvragen meer (TIJDBUDGET_MINUTEN)
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # De token niet in .git/config laten staan: alleen de publiceerstap
+          # krijgt schrijfrechten
+          persist-credentials: false
 
+      # Zonder de vorige data zou de force-push hieronder alles wissen wat deze
+      # nacht niet lukt. Alleen als de tak echt nog niet bestaat (eerste run)
+      # beginnen we leeg; elke andere fout stopt de run.
       - name: Vorige data ophalen (blijft staan als iets mislukt)
         run: |
+          set -o pipefail
           mkdir -p uitvoer
-          if git fetch --depth=1 origin data 2>/dev/null; then
+          status=0
+          git ls-remote --exit-code --heads origin data > /dev/null || status=$?
+          if [ "$status" -eq 0 ]; then
+            git fetch --depth=1 origin data
             git archive FETCH_HEAD | tar -x -C uitvoer
+            test -f uitvoer/overzicht.csv || { echo "::error::overzicht.csv ontbreekt op de tak data"; exit 1; }
+          elif [ "$status" -eq 2 ]; then
+            echo "::warning::De tak data bestaat nog niet; de eerste run begint leeg."
+          else
+            echo "::error::De tak data kon niet worden gecontroleerd (git ls-remote gaf $status)."
+            exit 1
           fi
 
       - uses: r-lib/actions/setup-r@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2
@@ -53,6 +71,8 @@ jobs:
           CBS_OPNIEUW: ${{ inputs.cbs_opnieuw }}
 
       - name: Publiceren op tak 'data'
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd uitvoer
           git init -q -b data
@@ -61,7 +81,7 @@ jobs:
           git add -A
           git commit -q -m "Voorberekende data $(date -u +%F)"
           # Alleen de laatste versie bewaren, zodat de repository klein blijft
-          git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" data
+          git push -f -q "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
 
       - name: Archieven zonder CBS-gemeente melden
         run: |
