@@ -91,11 +91,11 @@ per term bekend (na het invullen door een vakinhoudelijk persoon).
 ## Fase 5: Onderhoud en portfolio
 | # | Wat |
 |---|---|
-| 5.1 | **Iv3-tabellen automatisch vinden** via de catalogus van dataderden.cbs.nl; budgetkeuzes afleiden uit wat beschikbaar is; `IV3_JAAR` en de jaartallen in de README opruimen. |
+| 5.1 | **Iv3-tabellen automatisch vinden** — afgerond: de nachtelijke run zoekt de tabellen in de catalogus van dataderden.cbs.nl en kiest per soort de twee nieuwste jaren waarvoor minstens de helft van de gemeenten cijfers heeft (`ontdek_iv3_keuzes()`); de app toont alleen keuzes waarvan de cijfers er zijn. Daarmee kwam de jaarrekening 2025 erbij. |
 | 5.2 | **Eén bron voor pakketten**: `renv.lock`, gebruikt door de Action, CI en het manifest; zoeksleutel als leesbare tekst in plaats van een hash van een R-object. |
 | 5.3 | **app.R opsplitsen in Shiny-modules** per tabblad; helper `opties_uit(input)`. |
 | 5.4 | **Geheugen**: verwerkte resultaten cachen in plaats van ruwe JSON (max ~50 MB); `bindCache()` op grafieken. |
-| 5.5 | **End-to-end-test** met shinytest2 of chromote tegen de online app (dagelijks, ook als uptime-check). |
+| 5.5 | **End-to-end-test** — afgerond als dagelijkse controle: `scripts/uptime.R` (chromote) opent de online app na de nachtelijke run en controleert resultaat, kaart en versheid (`.github/workflows/uptime.yml`). |
 | 5.6 | **Screenshots en projectpagina automatisch bijwerken** na een release. Deels afgerond: `Rscript scripts/screenshots.R` maakt ze opnieuw (nog niet automatisch na een release). |
 | 5.9 | **Vaste thema's en periodes, geen live API** — afgerond: vrij zoeken uit (`VRIJ_ZOEKEN`, code blijft), periodeblokken van vier jaar uit voorberekende cijfers per jaar, voorberekende fragmenten en documenten, trend met corona en verkiezingen, grafieken gedeeld tussen bezoekers (`bindCache`). Nachtelijke run in delen van acht jaar en een lagere precisie voor het samenvoegen van bijlagen (`PRECISIE_UNIEK` 3.000), nadat de server van OpenBesluitvorming alle verzoeken weigerde wegens geheugengebrek (circuit breaker); zware tellingen dragen daaraan bij. Later eventueel: vrij combineren van vaste termen via een eigen database (na afstemming met Open State Foundation). |
 | 5.8 | **Tweede volledige code-review (45 punten)** — afgerond (PR #9–#12): nachtelijke run kan geen data meer wissen of slechte data publiceren (tijdsbudget, bevestigen van echte afwijkingen, plausibiliteit CBS/PDOK); fragmenten op de achtergrond en alleen volledige resultaten cachen; zoektermen die als kolomnaam bestaan, onvolledige fusies, het lopende jaar, "bibliotheek" als cultuurwoord en stabiele sleutels over R-versies; kleine app- en tekstpunten. |

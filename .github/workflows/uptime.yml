@@ -1,0 +1,44 @@
+# Controleert elke ochtend, na de nachtelijke voorberekening, of de online app
+# werkt en verse gegevens toont (scripts/uptime.R). Wordt rood als dat niet
+# zo is; GitHub stuurt dan een mail. Eén keer per dag, omdat elke controle de
+# app wakker maakt en dat telt voor de actieve uren van Connect Cloud.
+name: Controle online app
+
+on:
+  schedule:
+    - cron: "43 5 * * *"   # elke ochtend om 05:43 UTC, na de run van 02:17
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  controle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: r-lib/actions/setup-r@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2
+        with:
+          # Dezelfde R-versie als de app op Connect (manifest.json, "platform")
+          r-version: "4.6.1"
+          use-public-rspm: true
+
+      - name: Maand bepalen (voor de pakketcache)
+        id: datum
+        run: echo "maand=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-pakketten-${{ runner.os }}-4.6.1-${{ hashFiles('.github/workflows/uptime.yml') }}-${{ steps.datum.outputs.maand }}
+
+      - name: R-pakketten installeren
+        run: |
+          Rscript -e 'p <- c("chromote", "jsonlite"); nieuw <- p[!vapply(p, requireNamespace, logical(1), quietly = TRUE)]; if (length(nieuw) > 0) install.packages(nieuw)'
+
+      - name: Online app controleren
+        run: Rscript scripts/uptime.R

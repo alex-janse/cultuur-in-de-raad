@@ -247,7 +247,7 @@ ui <- function(request) {
           tabPanel(
             "Aandacht vs. budget", value = "budget",
             br(),
-            selectInput("budget_keuze", "Budget", choices = IV3_KEUZES),
+            selectInput("budget_keuze", "Budget", choices = iv3_keuzes()),
             plotOutput("budget_plot", height = 560,
                        hover = hoverOpts("budget_hover", delay = 100)),
             uiOutput("budget_hover_info"),
@@ -298,7 +298,7 @@ server <- function(input, output, session) {
     if (isTRUE(input$maatstaf %in% MAATSTAVEN)) input$maatstaf else MAATSTAVEN[[1]]
   })
   budget_keuze <- reactive({
-    req(isTRUE(input$budget_keuze %in% IV3_KEUZES))
+    req(isTRUE(input$budget_keuze %in% iv3_keuzes()))
     input$budget_keuze
   })
 
@@ -878,7 +878,7 @@ server <- function(input, output, session) {
       tekst
     }
     # Uit het procesgeheugen of de nachtelijke voorberekening; meestal direct
-    budget <- lasten_voor(IV3_KEUZES[[1]])
+    budget <- lasten_voor(iv3_keuzes()[[1]])
     euro <- if (!is.null(budget)) {
       budget$cultuur_per_inw[budget$gemeentecode %in% rij$gemeentecode][1]
     }
@@ -908,7 +908,7 @@ server <- function(input, output, session) {
         blok(fmt(rij$inwoners, 0), "inwoners (CBS)"),
         if (!is.null(euro) && !is.na(euro)) {
           blok(paste0("€", fmt(euro, 0)),
-               paste("cultuur per inwoner,", names(IV3_KEUZES)[1]))
+               paste("cultuur per inwoner,", names(iv3_keuzes())[1]))
         })
   })
 
@@ -923,8 +923,8 @@ server <- function(input, output, session) {
     }
     zinnen <- verhaal_gemeente(
       rij, res$per_gemeente, trend,
-      budget = lasten_voor(IV3_KEUZES[[1]]),
-      budget_label = names(IV3_KEUZES)[1]
+      budget = lasten_voor(iv3_keuzes()[[1]]),
+      budget_label = names(iv3_keuzes())[1]
     )
     req(length(zinnen) > 0)
     div(class = "verhaal", lapply(zinnen, tags$p))
@@ -952,13 +952,14 @@ server <- function(input, output, session) {
     req(input$tabs == "profiel")
     # Een keuze zonder data (bv. een begroting die CBS nog niet heeft) stil
     # overslaan; de grafiek toont dan de andere jaren
-    lasten <- bind_rows(lapply(IV3_KEUZES, lasten_voor, stil = TRUE))
+    lasten <- bind_rows(lapply(iv3_keuzes(), lasten_voor, stil = TRUE))
     shiny::validate(need(nrow(lasten) > 0, "Budgetgegevens niet beschikbaar."),
                     need(!is.na(rij$gemeentecode), "Geen CBS-gemeentecode."))
     plot_budget_trend(lasten, rij$gemeentecode, rij$gemeente)
   }, alt = reactive(sprintf(
-    "Staafdiagram: lasten voor cultuur per inwoner in %s naast de mediaan van alle gemeenten, 2023 tot en met 2026.",
-    profiel_rij()$gemeente))) |>
+    "Staafdiagram: lasten voor cultuur per inwoner in %s naast de mediaan van alle gemeenten, %s.",
+    profiel_rij()$gemeente,
+    paste(names(iv3_keuzes()), collapse = ", ")))) |>
     bindCache(input$profiel_gemeente, input$tabs == "profiel", Sys.Date())
 
   # Fragmenten: een verzoek aan de API per gemeente. Op de achtergrond (net
@@ -1072,7 +1073,7 @@ server <- function(input, output, session) {
 
   budget_plot <- reactive({
     plot_budget(budget_df(), resultaat()$jaren, aandacht_label(),
-                names(IV3_KEUZES)[IV3_KEUZES == budget_keuze()])
+                names(iv3_keuzes())[iv3_keuzes() == budget_keuze()])
   })
 
   output$budget_plot <- renderPlot(budget_plot(), alt = reactive(sprintf(paste(
@@ -1084,7 +1085,7 @@ server <- function(input, output, session) {
   output$budget_bron <- renderUI({
     req(budget_keuze())
     label <- paste("Bron: CBS Iv3,",
-                   tolower(names(IV3_KEUZES)[IV3_KEUZES == budget_keuze()]))
+                   tolower(names(iv3_keuzes())[iv3_keuzes() == budget_keuze()]))
     regel <- bron_regel(lees_voorberekend("bronversies.rds"), budget_keuze(), label)
     if (!is.null(regel)) helpText(regel)
   })

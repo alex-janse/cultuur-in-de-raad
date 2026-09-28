@@ -40,5 +40,5 @@ test_that("voorberekende_bestanden noemt alles wat de app nodig heeft", {
   b <- voorberekende_bestanden()
   expect_true(all(c("bronversies.rds", "gemeentegrenzen.rds") %in% b))
   expect_length(grep("^zoek_", b), length(voorberekende_sets()))
-  expect_length(grep("^iv3_", b), length(IV3_KEUZES))
+  expect_length(grep("^iv3_", b), length(iv3_keuzes()))
 })

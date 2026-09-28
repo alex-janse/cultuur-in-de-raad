@@ -137,7 +137,7 @@ voorberekende_bestanden <- function() {
   sleutels <- vapply(voorberekende_sets(), \(t) {
     zoek_sleutel(t, volledige_periode(), STANDAARD_OPTIES)
   }, "")
-  c("bronversies.rds", "gemeentegrenzen.rds", sprintf("iv3_%s.rds", IV3_KEUZES),
+  c("bronversies.rds", "gemeentegrenzen.rds", sprintf("iv3_%s.rds", iv3_keuzes()),
     sprintf("zoek_%s.rds", sleutels))
 }
 

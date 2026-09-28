@@ -2,6 +2,7 @@
 
 [![Tests](https://github.com/alex-janse/cultuur-in-de-raad/actions/workflows/test.yml/badge.svg)](https://github.com/alex-janse/cultuur-in-de-raad/actions/workflows/test.yml)
 [![Voorberekening](https://github.com/alex-janse/cultuur-in-de-raad/actions/workflows/voorbereken.yml/badge.svg)](https://github.com/alex-janse/cultuur-in-de-raad/actions/workflows/voorbereken.yml)
+[![Online app](https://github.com/alex-janse/cultuur-in-de-raad/actions/workflows/uptime.yml/badge.svg)](https://github.com/alex-janse/cultuur-in-de-raad/actions/workflows/uptime.yml)
 [![Licentie: MIT](https://img.shields.io/badge/licentie-MIT-blue.svg)](LICENSE)
 
 Hoe vaak praten Nederlandse gemeenteraden over amateurkunst, cultuureducatie,
@@ -39,7 +40,7 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
   gemeenten naast heel Nederland. De gekozen periode, de coronaperiode en de
   verkiezingen (of starts van landelijke cultuurperiodes) zijn gemarkeerd.
 - **Gemeenteprofiel**: kerncijfers, een korte samenvatting in gewone taal, de
-  trend, de cultuurlasten per inwoner (2023–2026) en de nieuwste vermeldingen
+  trend, de cultuurlasten per inwoner (twee jaarrekeningen en twee begrotingen) en de nieuwste vermeldingen
   met de zin waarin de term staat.
 - **Aandacht vs. budget**: welke gemeenten praten veel over cultuur maar geven
   er weinig aan uit, en omgekeerd?
@@ -86,6 +87,10 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
 - **Getest**: testthat-tests zonder netwerk (met vaste voorbeelden) draaien
   bij elke push via GitHub Actions, inclusief een controle of het
   deploymanifest bij de code past.
+- **Bewaakt**: elke ochtend na de nachtelijke run opent een GitHub Action de
+  online app in een headless Chrome en controleert of het resultaat en de
+  kaart verschijnen en de gegevens vers zijn (`scripts/uptime.R`). Zo niet,
+  dan wordt de workflow rood en stuurt GitHub een mail.
 - **Veilig**: bronteksten worden ge-escaped, CSV-exports zijn beschermd tegen
   formule-injectie en de Actions staan vast op een commit-SHA.
 - **Gefaseerd ontwikkeld**: elke fase (stabiliteit, correcte cijfers,
@@ -141,9 +146,11 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
   over het onderwerp?"); het script berekent daarna de precisie per term.
 - **Budget**: gemeentelijke lasten per inwoner voor de taakvelden 5.3
   cultuur, 5.4 musea, 5.5 erfgoed en 5.6 media/bibliotheek, uit de
-  Iv3-gemeentefinanciën van het CBS (jaarrekening 2023/2024, begroting
-  2025/2026). Kapitaallasten en verrekeningen tellen mee; het bedrag is dus
-  een indicatie.
+  Iv3-gemeentefinanciën van het CBS: de twee nieuwste jaarrekeningen en de
+  twee nieuwste begrotingen waarvoor minstens de helft van de gemeenten
+  cijfers heeft. De nachtelijke run zoekt die zelf op in de catalogus van
+  dataderden.cbs.nl, dus een nieuw jaar komt vanzelf in de app. Kapitaallasten
+  en verrekeningen tellen mee; het bedrag is dus een indicatie.
 
 ## Kanttekeningen
 
@@ -267,10 +274,10 @@ R/nachtrun.R       nachtelijke run: bijwerken, afkeuren, opruimen, delen samenvo
 R/export.R         CSV-export
 R/namen.R          naamnormalisatie en opmaak
 R/uitleg.R         tabblad Uitleg
-scripts/           nachtelijke voorberekening, validatie, schermafbeeldingen en loadtest
+scripts/           nachtelijke voorberekening, validatie, schermafbeeldingen, loadtest en controle
 tests/testthat/    tests met vaste voorbeelden (fixtures)
 docs/              projectpagina (GitHub Pages) en screenshots
-.github/workflows/ tests en nachtelijke voorberekening
+.github/workflows/ tests, nachtelijke voorberekening en dagelijkse controle van de app
 ```
 
 ## Bronnen
