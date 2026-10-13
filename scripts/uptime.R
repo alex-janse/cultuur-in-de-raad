@@ -14,7 +14,23 @@ args <- commandArgs(trailingOnly = TRUE)
 url <- if (length(args) > 0) args[1] else
   "https://01a0d57f-3a32-a4ab-9874-1761a480a727.share.connect.posit.cloud/"
 
-b <- chromote::ChromoteSession$new(width = 1400, height = 1000)
+# Chrome start op een GitHub-runner soms trager dan de standaard 10 s van
+# chromote ("Chrome debugging port not open", 1 en 8 oktober 2026). Daarom
+# meer tijd en een paar pogingen, zodat de controle niet rood wordt zonder dat
+# de app zelf bekeken is.
+options(chromote.timeout = 60)
+b <- NULL
+for (poging in 1:3) {
+  b <- tryCatch(chromote::ChromoteSession$new(width = 1400, height = 1000),
+                error = function(e) {
+                  message("Chrome starten mislukt (poging ", poging, "): ",
+                          conditionMessage(e))
+                  NULL
+                })
+  if (!is.null(b)) break
+  Sys.sleep(5)
+}
+if (is.null(b)) stop("Chrome kon niet starten op de runner; de app is niet gecontroleerd.")
 b$Emulation$setFocusEmulationEnabled(enabled = TRUE)
 
 # De app kan in een iframe van Connect Cloud staan
