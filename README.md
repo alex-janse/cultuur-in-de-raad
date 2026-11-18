@@ -13,6 +13,13 @@ Dit R Shiny-dashboard doorzoekt de raadsdocumenten van ongeveer 290 gemeenten
 via [OpenBesluitvorming.nl](https://openbesluitvorming.nl) en combineert die
 met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
 
+> **Stand van zaken (november 2026):** Open State Foundation heeft de API van
+> Open Raadsinformatie, waarop de zoekvragen van deze app draaien, op
+> 1 november 2026 uitgezet. De cijfers in de app zijn voor het laatst
+> bijgewerkt op 11 november 2026 en de nachtelijke voorberekening staat uit.
+> De opvolger is de [API van OpenBesluitvorming](https://openbesluitvorming.nl/docs/api),
+> die geen vrije zoekvragen en aggregaties meer kent; de overstap is nog niet gemaakt.
+
 **[Open het dashboard](https://01a0d57f-3a32-a4ab-9874-1761a480a727.share.connect.posit.cloud/)** ·
 [Projectpagina](https://alex-janse.github.io/cultuur-in-de-raad/) ·
 [Roadmap](ROADMAP.md)
@@ -61,8 +68,8 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
   dus niet. Vrij zoeken (eigen termen, periode en opties) zit nog in de code
   en gaat aan met `VRIJ_ZOEKEN <- TRUE` in `R/config.R`; die zoekvragen lopen
   dan asynchroon (`shiny::ExtendedTask` + `mirai`).
-- **Nachtelijke voorberekening**: een GitHub Action rekent elk thema over alle
-  jaren uit (in delen van acht jaar, `PERIODE_DEEL_JAREN`, zodat elk verzoek
+- **Nachtelijke voorberekening** (staat uit sinds de bron is gestopt, zie
+  boven): een GitHub Action rekent elk thema over alle jaren uit (in delen van acht jaar, `PERIODE_DEEL_JAREN`, zodat elk verzoek
   licht blijft voor de server), plus per gemeente de nieuwste vermeldingen
   met fragment en per jaar de nieuwste documenten. De app telt de
   periodeblokken daaruit op. Ook CBS-cijfers en gemeentegrenzen staan op de
@@ -87,10 +94,10 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
 - **Getest**: testthat-tests zonder netwerk (met vaste voorbeelden) draaien
   bij elke push via GitHub Actions, inclusief een controle of het
   deploymanifest bij de code past.
-- **Bewaakt**: elke ochtend na de nachtelijke run opent een GitHub Action de
-  online app in een headless Chrome en controleert of het resultaat en de
-  kaart verschijnen en de gegevens vers zijn (`scripts/uptime.R`). Zo niet,
-  dan wordt de workflow rood en stuurt GitHub een mail.
+- **Bewaakt**: elke ochtend opent een GitHub Action de online app in een
+  headless Chrome en controleert of het resultaat en de kaart verschijnen en
+  de app niet waarschuwt voor ontbrekende gegevens (`scripts/uptime.R`). Zo
+  niet, dan wordt de workflow rood en stuurt GitHub een mail.
 - **Veilig**: bronteksten worden ge-escaped, CSV-exports zijn beschermd tegen
   formule-injectie en de Actions staan vast op een commit-SHA.
 - **Gefaseerd ontwikkeld**: elke fase (stabiliteit, correcte cijfers,
@@ -189,8 +196,8 @@ met open data van het CBS en PDOK. Alle bronnen zijn gratis en openbaar.
   `R/config.R`).
 - **Verwijderen**: staat er iets over jou in een raadsstuk dat daar niet
   hoort, dan kan dat alleen bij de bron worden verwijderd (de gemeente en
-  OpenBesluitvorming.nl). Daarna verdwijnt het hier vanzelf na de nachtelijke
-  bijwerking: meestal binnen een dag, uiterlijk na ongeveer een week.
+  OpenBesluitvorming.nl). Daarna verdwijnt het hier bij de volgende
+  voorberekening (nu alleen handmatig, zolang de nachtelijke run uit staat).
 - **Veiligheid**: tekst uit de bron wordt altijd ge-escaped, links worden
   alleen getoond als ze met `http(s)://` beginnen, CSV-downloads zijn
   beschermd tegen formules (`=`, `+`, `-`, `@`) en voorberekende bestanden

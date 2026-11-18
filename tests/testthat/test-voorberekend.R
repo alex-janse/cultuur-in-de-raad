@@ -50,8 +50,14 @@ test_that("haal_resultaat gebruikt bruikbare voorberekende data", {
 
 test_that("oud schema, te oude data of een kapot bestand worden niet gebruikt", {
   expect_false(bruikbaar_resultaat(nep_resultaat(schema = 0L)))
-  expect_false(bruikbaar_resultaat(
-    nep_resultaat(berekend_op = Sys.time() - (MAX_LEEFTIJD_DAGEN + 1) * 86400)))
+  if (is.finite(MAX_LEEFTIJD_DAGEN)) {
+    expect_false(bruikbaar_resultaat(
+      nep_resultaat(berekend_op = Sys.time() - (MAX_LEEFTIJD_DAGEN + 1) * 86400)))
+  } else {
+    # Bron gestopt: oude data blijft bruikbaar (zie MAX_LEEFTIJD_DAGEN)
+    expect_true(bruikbaar_resultaat(
+      nep_resultaat(berekend_op = Sys.time() - 400 * 86400)))
+  }
   expect_false(bruikbaar_resultaat(list(totaal_docs = 42)))
   expect_false(bruikbaar_resultaat("geen lijst"))
   expect_true(bruikbaar_resultaat(nep_resultaat()))

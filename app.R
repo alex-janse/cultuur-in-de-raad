@@ -601,10 +601,7 @@ server <- function(input, output, session) {
         }),
       if (identical(res$bron, "voorberekend") &&
           leeftijd_dagen(res) > WAARSCHUW_LEEFTIJD_DAGEN) {
-        tags$div(class = "text-warning",
-                 sprintf("Let op: deze gegevens zijn %d dagen oud; de nachtelijke",
-                         floor(leeftijd_dagen(res))),
-                 "bijwerking is waarschijnlijk mislukt.")
+        tags$div(class = "text-muted", tags$small(BRON_GESTOPT_MELDING))
       },
       if (!res$inwoners_ok) {
         tags$div(class = "text-warning", "CBS-inwonersdata niet beschikbaar.")

@@ -1,11 +1,17 @@
-# Rekent elke nacht de standaardzoekvragen, CBS-cijfers en gemeentegrenzen
-# uit en zet ze op de tak 'data'. De app leest die eerst, zodat hij direct
-# laadt en de API van OpenBesluitvorming minder belast.
+# Rekent de standaardzoekvragen, CBS-cijfers en gemeentegrenzen uit en zet ze
+# op de tak 'data'. De app leest die eerst, zodat hij direct laadt en de API
+# minder belast.
+#
+# De nachtelijke run staat uit sinds 18 november 2026: Open State Foundation
+# heeft de API van Open Raadsinformatie (api.openraadsinformatie.nl) op
+# 1 november 2026 uitgezet, dus elke run mislukte (zie BRON_GESTOPT_MELDING in
+# R/config.R). Handmatig starten kan nog, bv. voor CBS-cijfers. Weer
+# inschakelen zodra de app op de opvolger (openbesluitvorming.nl/api) draait.
 name: Voorberekenen
 
 on:
-  schedule:
-    - cron: "17 2 * * *"   # elke nacht om 02:17 UTC
+  # schedule:
+  #   - cron: "17 2 * * *"   # elke nacht om 02:17 UTC
   workflow_dispatch:        # handmatig starten via het tabblad Actions
     inputs:
       cbs_opnieuw:
