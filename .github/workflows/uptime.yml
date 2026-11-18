@@ -1,12 +1,15 @@
-# Controleert elke ochtend, na de nachtelijke voorberekening, of de online app
-# werkt en verse gegevens toont (scripts/uptime.R). Wordt rood als dat niet
-# zo is; GitHub stuurt dan een mail. Eén keer per dag, omdat elke controle de
-# app wakker maakt en dat telt voor de actieve uren van Connect Cloud.
+# Controleert elke ochtend of de online app werkt (scripts/uptime.R): resultaat
+# en kaart verschijnen en de app waarschuwt niet voor ontbrekende gegevens.
+# Wordt rood als dat niet zo is; GitHub stuurt dan een mail. Eén keer per dag,
+# omdat elke controle de app wakker maakt en dat telt voor de actieve uren van
+# Connect Cloud. (Sinds de bron op 1 november 2026 is gestopt, staat de
+# nachtelijke voorberekening uit; de app toont dan de vaste melding uit
+# BRON_GESTOPT_MELDING, geen waarschuwing.)
 name: Controle online app
 
 on:
   schedule:
-    - cron: "43 5 * * *"   # elke ochtend om 05:43 UTC, na de run van 02:17
+    - cron: "43 5 * * *"   # elke ochtend om 05:43 UTC (GitHub start vaak uren later)
   workflow_dispatch:
 
 permissions:
