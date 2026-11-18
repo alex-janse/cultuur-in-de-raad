@@ -2682,7 +2682,7 @@
   },
   "files": {
     "app.R": {
-      "checksum": "ccb570d352ee6c129a5f030d8e559cd4"
+      "checksum": "97f7bd430131f1d1c244e974318fa261"
     },
     "R/00_pakketten.R": {
       "checksum": "8cbd0326cdeca71d715fdbac31aa17ab"
@@ -2697,7 +2697,7 @@
       "checksum": "46d6f05287fa3a3a411d8a1bb6e0ea88"
     },
     "R/config.R": {
-      "checksum": "2d8cd1d3c7c45a80875797cb755c5dcb"
+      "checksum": "07d5401fe5c622c6cfad504bec8d7fb3"
     },
     "R/export.R": {
       "checksum": "2f4d14fa8953d8afd0372618e00fc01c"

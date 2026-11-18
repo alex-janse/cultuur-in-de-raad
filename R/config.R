@@ -65,9 +65,21 @@ CULTUURPERIODE_START <- c(2017L, 2021L, 2025L)
 # methode_versie() onderaan).
 SCHEMA_VERSIE <- 4L   # 2: trends per gemeente, dekking en bandbreedtes; 3: termkolommen n_<term>;
                       # 4: fragmenten en docs_jaren (vaste thema's zonder API)
-# Voorberekende data ouder dan dit wordt niet meer gebruikt (dan live)
-MAX_LEEFTIJD_DAGEN <- 7
+# Voorberekende data ouder dan dit wordt niet meer gebruikt (dan live). Staat
+# op Inf sinds de bron is gestopt (zie BRON_GESTOPT_MELDING): er komt geen
+# nieuwe data meer en zonder live zoeken zou de app anders leeg zijn.
+MAX_LEEFTIJD_DAGEN <- Inf
 WAARSCHUW_LEEFTIJD_DAGEN <- 2
+
+# Open State Foundation heeft de API van Open Raadsinformatie (de bron van de
+# raadsstukken) op 1 november 2026 uitgezet; de laatste geslaagde voorberekening
+# is van 11 november 2026. De app toont dit bij gegevens ouder dan
+# WAARSCHUW_LEEFTIJD_DAGEN, in plaats van de waarschuwing dat de nachtelijke
+# bijwerking is mislukt. Opvolger: https://openbesluitvorming.nl/docs/api
+BRON_GESTOPT_MELDING <- paste(
+  "De API van Open Raadsinformatie, de bron van de raadsstukken, is op",
+  "1 november 2026 gestopt. De cijfers worden daarom niet meer bijgewerkt."
+)
 
 MAX_TERMEN <- 8               # meer termen = zwaardere zoekvraag voor de API
 MIN_TEKENS_WOORDVORMEN <- 4   # 'ku*' is duur en loopt tegen limieten aan
